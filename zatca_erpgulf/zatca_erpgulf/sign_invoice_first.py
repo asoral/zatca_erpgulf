@@ -142,8 +142,8 @@ def create_private_keys(company_abbr, zatca_doc):
                 "Company", {"abbr": company_abbr}, "name"
             )
             company_doc = frappe.get_doc("Company", company_name)
-            if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-                company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            # if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            #     company_doc = frappe.get_doc("Company",company_doc.parent_company)
         private_key = ec.generate_private_key(ec.SECP256K1(), backend=default_backend())
         private_key_pem = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
