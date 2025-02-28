@@ -79,13 +79,15 @@ def get_csr_data_multiple(zatca_doc):
 def get_csr_data(company_abbr):
     """Getting csr data from the config"""
     try:
+        
         company_name = frappe.db.get_value("Company", {"abbr": company_abbr}, "name")
         if not company_name:
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
-        # if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-        #     company_doc = frappe.get_doc("Company",company_doc.parent_company)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            # company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            company_name = frappe.db.get_value("Company",company_doc.parent_company, 'name')
 
         csr_config_string = company_doc.custom_csr_config
 
@@ -142,8 +144,8 @@ def create_private_keys(company_abbr, zatca_doc):
                 "Company", {"abbr": company_abbr}, "name"
             )
             company_doc = frappe.get_doc("Company", company_name)
-            # if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            #     company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+                company_doc = frappe.get_doc("Company",company_doc.parent_company)
         private_key = ec.generate_private_key(ec.SECP256K1(), backend=default_backend())
         private_key_pem = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
