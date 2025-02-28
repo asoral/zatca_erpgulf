@@ -364,6 +364,8 @@ def item_data(invoice, pos_invoice_doc):
             cbc_priceamount.set("currencyID", pos_invoice_doc.currency)
             company_name = pos_invoice_doc.company
             settings = frappe.get_doc("Company", company_name)
+            if not settings.is_group and settings.parent_company and settings.custom_costcenter:
+                settings = frappe.get_doc("Company", settings.parent_company)
             if settings.custom_submit_line_item_discount_to_zatca != 1:
                 if tax_rate.included_in_print_rate == 0:
                     cbc_priceamount.text = str(
@@ -488,6 +490,8 @@ def item_data_with_template(invoice, pos_invoice_doc):
             cbc_priceamount.set("currencyID", pos_invoice_doc.currency)
             company_name = pos_invoice_doc.company
             settings = frappe.get_doc("Company", company_name)
+            if not settings.is_group and settings.parent_company and settings.custom_costcenter:
+                settings = frappe.get_doc("Company", settings.parent_company)
             if settings.custom_submit_line_item_discount_to_zatca != 1:
                 cbc_priceamount.text = f"{abs(single_item.rate):.6f}"
             if settings.custom_submit_line_item_discount_to_zatca == 1:

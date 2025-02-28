@@ -75,6 +75,11 @@ def zatca_call_pos_without_xml(
         company_abbr = frappe.db.get_value(
             "Company", {"name": pos_invoice_doc.company}, "abbr"
         )
+        company_doc = frappe.get_doc("Company", pos_invoice_doc.company)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_abbr = frappe.db.get_value(
+                "Company", {"name": company_doc.parent_company}, "abbr"
+            )
 
         customer_doc = frappe.get_doc("Customer", pos_invoice_doc.customer)
 
@@ -193,10 +198,18 @@ def reporting_api_pos_without_xml(
             "Company", {"name": pos_invoice_doc.company}, "abbr"
         )
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company", company_doc.parent_company)
+            company_abbr = company_doc.abbr
         if not company_abbr:
             frappe.throw(
                 f"Company with abbreviation {pos_invoice_doc.company} not found."
             )
+        # if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+        #     company_abbr = frappe.db.get_value(
+        #         "Company", {"name": company_doc.parent_company}, "abbr"
+        #     )
+
 
         # Prepare the payload without JSON formatting
         payload = {

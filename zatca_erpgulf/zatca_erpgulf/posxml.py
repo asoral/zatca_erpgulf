@@ -347,19 +347,26 @@ def get_pih_for_company(pih_data, company_name):
     """function for get pih for company"""
     try:
         for entry in pih_data.get("data", []):
-            if entry.get("company") == company_name:
-                return entry.get("pih")
-        frappe.throw("Error while retrieving  PIH of company for production:  ")
+            if entry.get('company'):
+                is_group, custom_costcenter, c_name = frappe.db.get_value('Company', entry.get('company'), ['is_group', 'custom_costcenter','name'])
+                if not is_group and custom_costcenter:
+                    if c_name == company_name:
+                        return entry.get("pih")
+                else:
+                    if entry.get("company") == company_name:
+                        return entry.get("pih")
+
+        frappe.throw("Error while retrieving  PIH of parent company for production:  ")
     except (KeyError, AttributeError, ValueError) as e:
         frappe.throw(
-            f"Error in getting PIH of company '{company_name}' for production: {e}"
+            f"Error in getting PIH of parent company '{company_name}' for production: {e}"
         )
         return None  # Ensures consistent return
 
 
 def additional_reference(invoice, company_abbr, pos_invoice_doc):
     """Function for additional reference"""
-    try:
+    try:            
         company_name = frappe.db.get_value("Company", {"abbr": company_abbr}, "name")
         if not company_name:
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
@@ -550,6 +557,9 @@ def company_data(invoice, pos_invoice_doc):
     """Function for adding company data to the POS invoice"""
     try:
         company_doc = frappe.get_doc("Company", pos_invoice_doc.company)
+
+        if not company_doc.is_group and company_doc.parent_company:
+            company_doc = frappe.get_doc("Company", company_doc.parent_company)
 
         # If Company requires Cost Center but it's missing, throw an error
         if company_doc.custom_costcenter == 1 and not pos_invoice_doc.cost_center:

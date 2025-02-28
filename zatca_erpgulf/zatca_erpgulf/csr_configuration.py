@@ -16,6 +16,8 @@ def get_csr_config(company_abbr):
         if not company_name_val:
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
         company_doc = frappe.get_doc("Company", company_name_val)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
         tax_id = company_doc.tax_id
         location = company_doc.custom_zatca__location_for_csr_configuratoin
         business_category = (

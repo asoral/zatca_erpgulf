@@ -91,6 +91,9 @@ def get_api_url(company_abbr, base_url):
     """There are many api susing in zatca which can be defined by a feild in settings"""
     try:
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_abbr = frappe.db.get_value('Company', company_doc.parent_company, 'abbr')
+
         if company_doc.custom_select == "Sandbox":
             url = company_doc.custom_sandbox_url + base_url
         elif company_doc.custom_select == "Simulation":
@@ -208,7 +211,10 @@ def reporting_api(
             frappe.throw(
                 f"Company with abbreviation {sales_invoice_doc.company} not found."
             )
+        
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
         payload = {
             "invoiceHash": encoded_hash,
             "uuid": uuid1,
@@ -365,7 +371,7 @@ def reporting_api(
                         f"Status Code: {response.status_code}<br><br> "
                         f"Zatca Response: {response.text}<br><br>"
                     )
-                    company_name = sales_invoice_doc.company
+                    company_name = company_doc.name
                     # settings = frappe.get_doc("Company", company_name)
                     # company_abbr = settings.abbr
                     # if settings.custom_send_einvoice_background:
@@ -440,7 +446,12 @@ def clearance_api(
             frappe.throw(
                 f" problem with company name in {sales_invoice_doc.company} not found."
             )
+            
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            company_abbr = company_doc.abbr
+
         # production_csid = company_doc.custom_basic_auth_from_production or ""
         if sales_invoice_doc.custom_zatca_pos_name:
             zatca_settings = frappe.get_doc(
@@ -547,7 +558,7 @@ def clearance_api(
                 f"Zatca Response: {response.text}<br><br>"
             )
 
-            company_name = sales_invoice_doc.company
+            company_name = company_doc.name
             # settings = frappe.get_doc("Company", company_name)
             # company_abbr = settings.abbr
             # if settings.custom_send_einvoice_background:
@@ -664,6 +675,11 @@ def zatca_call(
         company_abbr = frappe.db.get_value(
             "Company", {"name": sales_invoice_doc.company}, "abbr"
         )
+        company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_abbr = frappe.db.get_value(
+                "Company", {"name": company_doc.parent_company}, "abbr"
+            )
 
         customer_doc = frappe.get_doc("Customer", sales_invoice_doc.customer)
 
@@ -810,6 +826,9 @@ def zatca_call_compliance(
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            company_abbr = company_doc.abbr
 
         if company_doc.custom_validation_type == "Simplified Invoice":
             compliance_type = "1"
@@ -936,6 +955,9 @@ def zatca_background(invoice_number, source_doc, bypass_background_check=False):
         sales_invoice_doc = frappe.get_doc("Sales Invoice", invoice_number)
         company_name = sales_invoice_doc.company
         settings = frappe.get_doc("Company", company_name)
+        if not settings.is_group and settings.custom_costcenter and settings.parent_company:
+            settings = frappe.get_doc("Company", settings.parent_company)
+            
         company_abbr = settings.abbr
 
         if (
@@ -1146,6 +1168,10 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
                 f"Company abbreviation for {sales_invoice_doc.company} not found."
             )
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            company_abbr.abbr
+
         if company_doc.custom_zatca_invoice_enabled != 1:
             # frappe.msgprint("Zatca Invoice is not enabled. Submitting the document.")
             return  # Exit the function without further checks
@@ -1261,6 +1287,8 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
             )
         company_name = sales_invoice_doc.company
         settings = frappe.get_doc("Company", company_name)
+        if not settings.is_group and settings.parent_company and settings.custom_costcenter:
+            settings = frappe.get_doc("Company",settings.parent_company)
         # if settings.custom_phase_1_or_2 == "Phase-2":
         is_gpos_installed = "gpos" in frappe.get_installed_apps()
         field_exists = frappe.get_meta("Sales Invoice").has_field("custom_unique_id")
@@ -1345,6 +1373,8 @@ def resubmit_invoices(invoice_numbers, bypass_background_check=False):
             # Fetch the Sales Invoice document
             sales_invoice_doc = frappe.get_doc("Sales Invoice", invoice_number)
             company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
+            if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+                company_doc = frappe.get_doc("Company",company_doc.parent_company)
             if (
                 sales_invoice_doc.docstatus == 1
             ):  # Check if the invoice is already submitted

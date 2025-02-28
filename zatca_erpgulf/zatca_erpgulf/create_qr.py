@@ -33,6 +33,9 @@ from erpnext import get_region
 
 
 def create_qr_code(doc, method=None):  # pylint: disable=unused-argument
+    company_doc = frappe.get_doc("Company", doc.company)
+    if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+        company_doc = frappe.get_doc("Company",company_doc.parent_company)
     """this concept is giving A qr code for every time of zatca call
     TLV conversion for
         1. Seller's Name
@@ -75,13 +78,13 @@ def create_qr_code(doc, method=None):  # pylint: disable=unused-argument
         # Sellers Name
 
         seller_name = frappe.db.get_value(
-            "Company", doc.company, "custom__company_name_in_arabic__"
+            "Company", company_doc.name, "custom__company_name_in_arabic__"
         )
 
         if not seller_name:
             frappe.throw(
                 _("Arabic name missing for {} in the company document").format(
-                    doc.company
+                    company_doc.name
                 )
             )
 
@@ -91,10 +94,10 @@ def create_qr_code(doc, method=None):  # pylint: disable=unused-argument
         tlv_array.append("".join([tag, length, value]))
 
         # VAT Number
-        tax_id = frappe.db.get_value("Company", doc.company, "tax_id")
+        tax_id = frappe.db.get_value("Company", company_doc.name, "tax_id")
         if not tax_id:
             frappe.throw(
-                _("Tax ID missing for {} in the company document").format(doc.company)
+                _("Tax ID missing for {} in the company document").format(company_doc.name)
             )
 
         tag = bytes([2]).hex()

@@ -70,6 +70,8 @@ def reporting_api_machine(
             frappe.throw(
                 f"Company with abbreviation {pos_invoice_doc.company} not found."
             )
+        
+        company_doc = frappe.get_doc("Company",{'abbr':company_abbr})
 
         # Prepare the payload without JSON formatting
         payload = {

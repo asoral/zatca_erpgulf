@@ -93,6 +93,9 @@ def reporting_api(
 
         # Retrieve the company document using the abbreviation
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            company_abbr = company_doc.abbr
 
         # Prepare the payload without JSON formatting
         xml_base64 = xml_base64_decode(signed_xmlfile_name)
@@ -263,7 +266,7 @@ def reporting_api(
                         f"Zatca Response: {response.text}<br><br>"
                     )
 
-                    company_name = pos_invoice_doc.company
+                    company_name = company_doc.name
                     if pos_invoice_doc.custom_zatca_pos_name:
                         if (
                             zatca_settings.custom_send_pos_invoices_to_zatca_on_background
@@ -329,6 +332,9 @@ def clearance_api(
             )
 
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            company_abbr = company_doc.abbr
         if pos_invoice_doc.custom_zatca_pos_name:
             zatca_settings = frappe.get_doc(
                 "Zatca Multiple Setting", pos_invoice_doc.custom_zatca_pos_name
@@ -454,7 +460,7 @@ def clearance_api(
             )
 
             # frappe.msgprint(msg)
-            company_name = pos_invoice_doc.company
+            company_name = company_doc.name
             if pos_invoice_doc.custom_zatca_pos_name:
                 if zatca_settings.custom_send_pos_invoices_to_zatca_on_background:
                     frappe.msgprint(msg)
@@ -530,10 +536,18 @@ def zatca_call(
         invoice = xml_tags()
         invoice, uuid1, pos_invoice_doc = salesinvoice_data(invoice, invoice_number)
 
-        # Get the company abbreviation
+        
         company_abbr = frappe.db.get_value(
             "Company", {"name": pos_invoice_doc.company}, "abbr"
         )
+        # Get the company abbreviation
+        company_doc = frappe.get_doc("Company",pos_invoice_doc.company)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_abbr = frappe.db.get_value(
+                "Company", {"name": company_doc.parent_company}, "abbr"
+            )
+
+        
 
         customer_doc = frappe.get_doc("Customer", pos_invoice_doc.customer)
 
@@ -663,6 +677,10 @@ def zatca_call_compliance(
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_abbr = frappe.db.get_value(
+                "Company", {"name": company_doc.parent_company}, "abbr"
+            )
 
         # Determine compliance type based on company settings
         if company_doc.custom_validation_type == "Simplified Invoice":
@@ -790,6 +808,8 @@ def zatca_background_(invoice_number, source_doc, bypass_background_check=False)
         company_name = pos_invoice_doc.company
 
         settings = frappe.get_doc("Company", company_name)
+        if settings.is_group and settings.custom_costcenter and settings.parent_company:
+            settings = frappe.get_doc("Company", settings.parent_company)
         company_abbr = settings.abbr
 
         any_item_has_tax_template = any(
@@ -988,6 +1008,12 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
             frappe.throw(
                 f"Company abbreviation for {pos_invoice_doc.company} not found."
             )
+        # if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+        company_doc = frappe.get_doc("Company",{'abbr':company_abbr})
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            company_abbr = company_doc.name
+
 
         any_item_has_tax_template = False
 
@@ -1081,7 +1107,7 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
 
         if pos_invoice_doc.custom_zatca_status in ["REPORTED", "CLEARED"]:
             frappe.throw("Already submitted to Zakat and Tax Authority")
-        company_name = pos_invoice_doc.company
+        company_name = company_doc.name
 
         # Retrieve the company document to access settings
         settings = frappe.get_doc("Company", company_name)
@@ -1091,7 +1117,7 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
         #     )
         # else:
         #     create_qr_code(pos_invoice_doc, method=None)
-        settings = frappe.get_doc("Company", company_name)
+        # settings = frappe.get_doc("Company", company_name)
 
         is_gpos_installed = "gpos" in frappe.get_installed_apps()
         field_exists = frappe.get_meta("POS Invoice").has_field("custom_unique_id")
@@ -1178,6 +1204,8 @@ def resubmit_invoices_pos(invoice_numbers, bypass_background_check=False):
             # Fetch the Sales Invoice document
             pos_invoice_doc = frappe.get_doc("POS Invoice", invoice_number)
             company_doc = frappe.get_doc("Company", pos_invoice_doc.company)
+            if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+                company_doc = frappe.get_doc("Company",company_doc.parent_company)
 
             if (
                 pos_invoice_doc.docstatus == 1

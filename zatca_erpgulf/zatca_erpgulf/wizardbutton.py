@@ -11,6 +11,8 @@ def get_api_url(company_abbr, base_url):
     """There are many api susing in zatca which can be defined by a feild in settings"""
     try:
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
+        if not company_doc.is_group and company_doc.custom_costcenter and company_doc.parent_company:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
         if company_doc.custom_select == "Sandbox":
             url = company_doc.custom_sandbox_url + base_url
         elif company_doc.custom_select == "Simulation":
@@ -48,6 +50,10 @@ def wizard_button(company_abbr, button, pos=0, machine=None):
 
         # Validate and fetch company name
         company_name = frappe.db.get_value("Company", {"abbr": company_abbr}, "name")
+        _company = frappe.get_doc("Company", company_name)
+        if not _company.is_group and _company.parent_company and _company.custom_costcenter:
+            company_name = _company.name
+
         if not company_name:
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 

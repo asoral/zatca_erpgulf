@@ -397,6 +397,7 @@ def doc_reference_compliance(
 
 
 def get_pih_for_company(pih_data, company_name):
+    print("args:---->",pih_data, company_name)
     """
     Retrieves the PIH for a specific company from the provided data.
     """
@@ -488,13 +489,13 @@ def get_address(sales_invoice_doc, company_doc):
     - If a cost center is selected but has no address, an error is raised.
     - Otherwise, use the first available company address.
     """
-    if company_doc.custom_costcenter == 1 and sales_invoice_doc.cost_center:
-        cost_center_doc = frappe.get_doc("Cost Center", sales_invoice_doc.cost_center)
+    if company_doc.custom_costcenter == 1 and sales_invoice_doc.company:
+        cost_center_doc = frappe.get_doc("Company", sales_invoice_doc.company)
 
         # Ensure the Cost Center has a linked address
         if not cost_center_doc.custom_zatca_branch_address:
             frappe.throw(
-                f"No address is set for the selected Cost Center: {cost_center_doc.name}. Please add an address."
+                f"No address is set for the selected Comapny: {cost_center_doc.name}. Please add an address."
             )
 
         address_list = frappe.get_all(
@@ -512,7 +513,7 @@ def get_address(sales_invoice_doc, company_doc):
 
         if not address_list:
             frappe.throw(
-                f"ZATCA requires a proper address. Please add an address for Cost Center: {cost_center_doc.name}."
+                f"ZATCA requires a proper address. Please add an address for Company: {cost_center_doc.name}."
             )
 
         return address_list[0]  # Return the Cost Center's address
@@ -545,16 +546,18 @@ def company_data(invoice, sales_invoice_doc):
     """
     try:
         company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
-        if company_doc.custom_costcenter == 1 and not sales_invoice_doc.cost_center:
-            frappe.throw("no Cost Center is set in the invoice.Give the feild")
+        if not company_doc.is_group and company_doc.custom_costcenter and company_doc.parent_company:
+            company_doc = frappe.get_doc("Company", company_doc.parent_company)
+        if company_doc.custom_costcenter == 1 and not sales_invoice_doc.company:
+            frappe.throw("No Company is set in the invoice.Give the feild")
         # Determine whether to fetch data from Cost Center or Company
-        if company_doc.custom_costcenter == 1 and sales_invoice_doc.cost_center:
+        if company_doc.custom_costcenter == 1 and sales_invoice_doc.company:
             cost_center_doc = frappe.get_doc(
-                "Cost Center", sales_invoice_doc.cost_center
+                "Company", sales_invoice_doc.company
             )
-            custom_registration_type = cost_center_doc.custom_zatca__registration_type
+            custom_registration_type = cost_center_doc.custom_registration_type
             custom_company_registration = (
-                cost_center_doc.custom_zatca__registration_number
+                cost_center_doc.custom_company_registration
             )
         else:
             custom_registration_type = company_doc.custom_registration_type

@@ -28,6 +28,8 @@ def get_api_url(company_abbr, base_url):
     """There are many api susing in zatca which can be defined by a feild in settings"""
     try:
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
+        if not company_doc.is_group and company_doc.custom_costcenter and company_doc.parent_company:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
         if company_doc.custom_select == "Sandbox":
             url = company_doc.custom_sandbox_url + base_url
         elif company_doc.custom_select == "Simulation":
@@ -124,12 +126,17 @@ def reporting_api_xml_sales_invoice_simplified(
         company_abbr = frappe.db.get_value(
             "Company", {"name": pos_invoice_doc.company}, "abbr"
         )
+
         if not company_abbr:
             frappe.throw(
                 f"Company with abbreviation {pos_invoice_doc.company} not found."
             )
 
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
+        if not company_doc.is_group and company_doc.custom_costcenter and company_doc.parent_company:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            company_abbr = company_doc.abbr
+
         production_csid = get_production_csid(pos_invoice_doc, company_doc)
         headers = get_headers(production_csid)
         payload = {
@@ -280,6 +287,8 @@ def update_company_or_pos_settings(pos_invoice_doc, encoded_hash, msg):
         zatca_settings.save(ignore_permissions=True)
     else:
         company_doc = frappe.get_doc("Company", pos_invoice_doc.company)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
         if company_doc.custom_send_einvoice_background:
             frappe.msgprint(msg)
         company_doc.custom_pih = encoded_hash

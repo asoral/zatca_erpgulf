@@ -121,6 +121,11 @@ def zatca_call_scheduler_background(
         company_abbr = frappe.db.get_value(
             "Company", {"name": sales_invoice_doc.company}, "abbr"
         )
+        company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_abbr = frappe.db.get_value(
+                "Company", {"name": company_doc.parent_company}, "abbr"
+            )
 
         customer_doc = frappe.get_doc("Customer", sales_invoice_doc.customer)
 
@@ -254,6 +259,9 @@ def reporting_api_sales_withoutxml(
                 f"Company with abbreviation {sales_invoice_doc.company} not found."
             )
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            company_abbr = company_doc.abbr
         payload = {
             "invoiceHash": encoded_hash,
             "uuid": uuid1,

@@ -87,6 +87,8 @@ def submit_posinvoices_to_zatca_background_process():
         for invoice in not_submitted_invoices:
             pos_invoice_doc = frappe.get_doc("POS Invoice", invoice["name"])
             company_doc = frappe.get_doc("Company", pos_invoice_doc.company)
+            if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+                company_doc = frappe.get_doc("Company",company_doc.parent_company)
             # print(f"Processing {pos_invoice_doc.name}", "ZATCA Background Job")
             if pos_invoice_doc.docstatus == 1:
                 zatca_background_on_submit(
