@@ -84,8 +84,8 @@ def get_csr_data(company_abbr):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+        # if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+        #     company_doc = frappe.get_doc("Company",company_doc.parent_company)
 
         csr_config_string = company_doc.custom_csr_config
 
@@ -351,6 +351,7 @@ def create_csid(zatca_doc, company_abbr):
                 company_doc = frappe.get_doc("Company",company_doc.parent_company)
                 company_name = company_doc.name
                 company_abbr = company_doc.abbr
+                
             csr_data_str = company_doc.get("custom_csr_data", "")
 
             # frappe.msgprint(f"Using OTP (Company): {csr_values}")
@@ -386,6 +387,8 @@ def create_csid(zatca_doc, company_abbr):
             {"gif_url": "/assets/zatca_erpgulf/js/loading.gif"},
             user=frappe.session.user,
         )
+
+        print("Res")
 
         response = requests.post(
             url=get_api_url(company_abbr, base_url="compliance"),
