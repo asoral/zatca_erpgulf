@@ -1012,7 +1012,7 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
         company_doc = frappe.get_doc("Company",{'abbr':company_abbr})
         if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
             company_doc = frappe.get_doc("Company",company_doc.parent_company)
-            company_abbr = company_doc.name
+            company_abbr = company_doc.abbr
 
 
         any_item_has_tax_template = False
