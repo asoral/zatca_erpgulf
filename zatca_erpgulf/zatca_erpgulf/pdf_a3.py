@@ -178,7 +178,8 @@ def embed_file_in_pdf(invoice_name, print_format=None, letterhead=None, language
         if not language:
             language = "en"  # Default language
         invoice_number = frappe.get_doc("Sales Invoice", invoice_name)
-
+        if "/" in invoice_name:
+            invoice_name = invoice_name.replace("/", "")
         xml_file = None
         cleared_xml_file_name = "Cleared xml file " + invoice_name + ".xml"
         reported_xml_file_name = "Reported xml file " + invoice_name + ".xml"
