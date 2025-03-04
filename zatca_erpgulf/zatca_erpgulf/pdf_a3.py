@@ -178,19 +178,27 @@ def embed_file_in_pdf(invoice_name, print_format=None, letterhead=None, language
         if not language:
             language = "en"  # Default language
         invoice_number = frappe.get_doc("Sales Invoice", invoice_name)
+
+        _invoice_name = invoice_name
+        if "/" in _invoice_name:
+            _invoice_name = _invoice_name.replace("/", "")
+
         
         xml_file = None
-        cleared_xml_file_name = "Cleared xml file " + invoice_name + ".xml"
-        reported_xml_file_name = "Reported xml file " + invoice_name + ".xml"
+        cleared_xml_file_name = "Cleared xml file " + _invoice_name + ".xml"
+        reported_xml_file_name = "Reported xml file " + _invoice_name + ".xml"
         attachments = frappe.get_all(
             "File", filters={"attached_to_name": invoice_name}, fields=["file_name"]
         )
-        if "/" in invoice_name:
-            invoice_name = invoice_name.replace("/", "")
+
+        print("***********",invoice_name, cleared_xml_file_name,attachments )
+        
 
         # Find the XML file attachment
         for attachment in attachments:
+
             file_name = attachment.get("file_name", None)
+            print("file name:----->",file_name, cleared_xml_file_name, (file_name == cleared_xml_file_name))
             if file_name == cleared_xml_file_name:
                 xml_file = os.path.join(
                     frappe.local.site, "private", "files", file_name
