@@ -167,81 +167,150 @@ def embed_file_in_pdf_1(input_pdf, xml_file, output_pdf):
         pdf.save(output_pdf)
 
 
+# @frappe.whitelist(allow_guest=False)
+# def embed_file_in_pdf(invoice_name, print_format=None, letterhead=None, language=None):
+#     """
+#     Embed XML into a PDF using pikepdf.
+#     """
+#     try:
+
+#         # frappe.throw(app_path)/opt/zatca/frappe-bench/apps/zatca_erpgulf/zatca_erpgulf
+#         if not language:
+#             language = "en"  # Default language
+#         invoice_number = frappe.get_doc("Sales Invoice", invoice_name)
+
+#         _invoice_name = invoice_name
+#         if "/" in _invoice_name:
+#             _invoice_name = _invoice_name.replace("/", "")
+
+        
+#         xml_file = None
+#         cleared_xml_file_name = "Cleared xml file " + _invoice_name + ".xml"
+#         reported_xml_file_name = "Reported xml file " + _invoice_name + ".xml"
+#         attachments = frappe.get_all(
+#             "File", filters={"attached_to_name": invoice_name}, fields=["file_name"]
+#         )
+
+#         print("***********",invoice_name, cleared_xml_file_name,attachments )
+        
+
+#         # Find the XML file attachment
+#         for attachment in attachments:
+
+#             file_name = attachment.get("file_name", None)
+#             print("file name:----->",file_name, cleared_xml_file_name, (file_name == cleared_xml_file_name))
+#             if file_name == cleared_xml_file_name:
+#                 xml_file = os.path.join(
+#                     frappe.local.site, "private", "files", file_name
+#                 )
+#                 break
+#             elif file_name == reported_xml_file_name:
+#                 xml_file = os.path.join(
+#                     frappe.local.site, "private", "files", file_name
+#                 )
+#                 break
+
+#         if not xml_file:
+#             frappe.throw(f"No XML file found for the invoice {invoice_name}!")
+#         input_pdf = generate_invoice_pdf(
+#             invoice_number,
+#             language=language,
+#             letterhead=letterhead,
+#             print_format=print_format,
+#         )
+
+#         # final_pdf = frappe.local.site + "/private/files/" + invoice_name + "output.pdf"
+#         final_pdf = (
+#             frappe.local.site + "/private/files/PDF-A3 " + invoice_name + " output.pdf"
+#         )
+#         # frappe.msgprint(f"Embedding XML into: {input_pdf}")
+#         with pikepdf.Pdf.open(input_pdf, allow_overwriting_input=True) as pdf:
+#             with open(xml_file, "rb") as xml_attachment:
+#                 pdf.attachments["invoice.xml"] = xml_attachment.read()
+#             pdf.save(input_pdf)
+#             embed_file_in_pdf_1(input_pdf, xml_file, final_pdf)
+
+#             file_doc = frappe.get_doc(
+#                 {
+#                     "doctype": "File",
+#                     "file_url": "/private/files/PDF-A3 " + invoice_name + " output.pdf",
+#                     "attached_to_doctype": "Sales Invoice",
+#                     "attached_to_name": invoice_name,
+#                     "is_private": 1,  # Make the file private
+#                 }
+#             )
+#         file_doc.insert(ignore_permissions=True)
+#         # frappe.msgprint(f"XML successfully embedded into: {input_pdf}")
+#         # frappe.throw(file_doc.file_url)
+#         return get_url(file_doc.file_url)
+
+#     except pikepdf.PdfError as e:
+#         frappe.msgprint(f"Error processing the PDF: {e}")
+#     except FileNotFoundError as e:
+#         frappe.msgprint(f"File not found: {e}")
+#     except IOError as e:
+#         frappe.msgprint(f"I/O error: {e}")  # Step 1: Embed the XML into the input
+
+
+
 @frappe.whitelist(allow_guest=False)
 def embed_file_in_pdf(invoice_name, print_format=None, letterhead=None, language=None):
     """
     Embed XML into a PDF using pikepdf.
     """
     try:
-
-        # frappe.throw(app_path)/opt/zatca/frappe-bench/apps/zatca_erpgulf/zatca_erpgulf
         if not language:
             language = "en"  # Default language
-        invoice_number = frappe.get_doc("Sales Invoice", invoice_name)
 
-        _invoice_name = invoice_name
-        if "/" in _invoice_name:
-            _invoice_name = _invoice_name.replace("/", "")
+        invoice_doc = frappe.get_doc("Sales Invoice", invoice_name)
 
-        
-        xml_file = None
-        cleared_xml_file_name = "Cleared xml file " + _invoice_name + ".xml"
-        reported_xml_file_name = "Reported xml file " + _invoice_name + ".xml"
+        sanitized_invoice_name = invoice_name.replace("/", "")  # Ensure no invalid characters
+
+        cleared_xml_file_name = f"Cleared xml file {sanitized_invoice_name}.xml"
+        reported_xml_file_name = f"Reported xml file {sanitized_invoice_name}.xml"
+
         attachments = frappe.get_all(
             "File", filters={"attached_to_name": invoice_name}, fields=["file_name"]
         )
 
-        print("***********",invoice_name, cleared_xml_file_name,attachments )
-        
-
-        # Find the XML file attachment
+        xml_file = None
         for attachment in attachments:
-
-            file_name = attachment.get("file_name", None)
-            print("file name:----->",file_name, cleared_xml_file_name, (file_name == cleared_xml_file_name))
-            if file_name == cleared_xml_file_name:
-                xml_file = os.path.join(
-                    frappe.local.site, "private", "files", file_name
-                )
-                break
-            elif file_name == reported_xml_file_name:
-                xml_file = os.path.join(
-                    frappe.local.site, "private", "files", file_name
-                )
+            file_name = attachment.get("file_name")
+            if file_name in [cleared_xml_file_name, reported_xml_file_name]:
+                xml_file = frappe.get_site_path("private", "files", file_name)
                 break
 
-        if not xml_file:
+        if not xml_file or not os.path.exists(xml_file):
             frappe.throw(f"No XML file found for the invoice {invoice_name}!")
+
         input_pdf = generate_invoice_pdf(
-            invoice_number,
+            invoice_doc,
             language=language,
             letterhead=letterhead,
             print_format=print_format,
         )
 
-        # final_pdf = frappe.local.site + "/private/files/" + invoice_name + "output.pdf"
-        final_pdf = (
-            frappe.local.site + "/private/files/PDF-A3 " + invoice_name + " output.pdf"
-        )
-        # frappe.msgprint(f"Embedding XML into: {input_pdf}")
+        # Ensure output directory exists
+        output_filename = f"PDF-A3 {sanitized_invoice_name} output.pdf"
+        output_path = frappe.get_site_path("private", "files", output_filename)
+
         with pikepdf.Pdf.open(input_pdf, allow_overwriting_input=True) as pdf:
             with open(xml_file, "rb") as xml_attachment:
                 pdf.attachments["invoice.xml"] = xml_attachment.read()
             pdf.save(input_pdf)
-            embed_file_in_pdf_1(input_pdf, xml_file, final_pdf)
 
-            file_doc = frappe.get_doc(
-                {
-                    "doctype": "File",
-                    "file_url": "/private/files/PDF-A3 " + invoice_name + " output.pdf",
-                    "attached_to_doctype": "Sales Invoice",
-                    "attached_to_name": invoice_name,
-                    "is_private": 1,  # Make the file private
-                }
-            )
+            embed_file_in_pdf_1(input_pdf, xml_file, output_path)
+
+        # Save the new PDF as a Frappe File record
+        file_doc = frappe.get_doc({
+            "doctype": "File",
+            "file_url": f"/private/files/{output_filename}",
+            "attached_to_doctype": "Sales Invoice",
+            "attached_to_name": invoice_name,
+            "is_private": 1,  # Make the file private
+        })
         file_doc.insert(ignore_permissions=True)
-        # frappe.msgprint(f"XML successfully embedded into: {input_pdf}")
-        # frappe.throw(file_doc.file_url)
+
         return get_url(file_doc.file_url)
 
     except pikepdf.PdfError as e:
@@ -249,4 +318,7 @@ def embed_file_in_pdf(invoice_name, print_format=None, letterhead=None, language
     except FileNotFoundError as e:
         frappe.msgprint(f"File not found: {e}")
     except IOError as e:
-        frappe.msgprint(f"I/O error: {e}")  # Step 1: Embed the XML into the input
+        frappe.msgprint(f"I/O error: {e}")
+
+
+
