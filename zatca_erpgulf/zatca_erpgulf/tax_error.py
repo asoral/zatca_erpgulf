@@ -1,6 +1,7 @@
 """this module contains functions that are used to validate tax information
 in sales invoices."""
 
+from erpnext import get_region
 import frappe
 
 
@@ -21,6 +22,9 @@ def validate_sales_invoice_taxes(doc, event=None):
     if customer_doc.custom_b2c != 1 and company_doc.custom_send_invoice_to_zatca == "Background" :
         frappe.throw("This customer should be B2C for Background")
     
+    region = get_region(company_doc.name)
+    if region not in ["Saudi Arabia"]:
+        return
 
     # If the company requires cost centers, ensure the invoice has one
     if company_doc.custom_costcenter == 1:
