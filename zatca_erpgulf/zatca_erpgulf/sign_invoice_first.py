@@ -584,6 +584,7 @@ def digital_signature(hash1, company_abbr, source_doc):
         if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
             company_doc = frappe.get_doc("Company",company_doc.parent_company)
         # frappe.throw(f"Source doc type: {type(source_doc)}, value: {source_doc}")
+        private_key_data_str = None        
         if source_doc:
             if source_doc.doctype in SUPPORTED_INVOICES:
                 # Use certificate from the company document for Sales Invoice
@@ -596,6 +597,7 @@ def digital_signature(hash1, company_abbr, source_doc):
                     private_key_data_str = company_doc.get("custom_private_key")
             elif source_doc.doctype == "Company":
                 private_key_data_str = company_doc.get("custom_private_key")
+                print("------------------------------> private Key", private_key_data_str)
 
         if not private_key_data_str:
             frappe.throw("No private key data found for the company.")

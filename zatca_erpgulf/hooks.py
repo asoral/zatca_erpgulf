@@ -262,6 +262,7 @@ doctype_js = {
     ],
     "Company": "public/js/company.js",
     "POS Invoice": ["public/js/our_pos_invoice.js", "public/js/badge_pos.js"],
+    "Purchase Invoice":"public/js/our_purchase_invoice.js"
 }
 
 doctype_list_js = {
@@ -276,6 +277,40 @@ fixtures = [
     {"dt": "Custom Field", "filters": {"module": "Zatca Erpgulf"}},
     {"dt": "Report", "filters": {"module": "Zatca Erpgulf"}},
     #    {"dt": "Page", "filters": {"module": "Zatca Erpgulf"}}
+    # {
+    #     'doctype': 'Custom Field',
+    #     'filters': {
+    #         'name': ['in', (
+    #             'Purchase Invoice-custom_b2c',
+    #             'Supplier-custom_zatca_type_simplified__b2c_',
+    #             'Purchase Invoice-custom_zatca_nominal_invoice',
+    #             'Purchase Invoice-custom_zatca_3rd_party_invoice',
+    #             'Purchase Invoice-custom_zatca_self_billed_invoice',
+    #             'Purchase Invoice-custom_zatca_summary_invoice',
+    #             'Supplier-custom_customer_id_number_for_zatca',
+    #             'Supplier-custom_customer_id_type_for_zatca',
+    #             'Purchase Invoice-custom_zatca_status_notification',
+    #             'Purchase Invoice-custom_zatca_full_response',
+    #             'Purchase Invoice-custom_ksa_einvoicing_xml',
+    #             'Purchase Invoice-custom_ksa_einvoicing_qr',
+    #             'Purchase Invoice-custom_zatca_pos_machine_name',
+    #             'Purchase Invoice-custom_offlineintegrations',
+    #             'Purchase Invoice-custom_section_break_wk5dv',
+    #             'Purchase Invoice-custom_user_invoice_number',
+    #             'Purchase Invoice-custom_uuid',
+    #             'Purchase Invoice-custom_zatca_export_invoice',
+    #             'Purchase Invoice-custom_submit_line_item_discount_to_zatca',
+    #             'Purchase Invoice-custom_zatca_discount_reason',
+    #             'Purchase Invoice-custom_zatca_discount_reason_code',
+    #             'Purchase Invoice-custom_exemption_reason_code',
+    #             'Purchase Invoice-custom_zatca_tax_category',
+    #             'Purchase Invoice-custom_zatca_status',
+
+
+
+    #         )]
+    #     },
+    # }
 ]
 
 app_include_css = "/assets/zatca_erpgulf/css/tooltip.css"

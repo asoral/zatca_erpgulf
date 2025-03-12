@@ -160,6 +160,48 @@ def reporting_api_xml_sales_invoice_simplified(
     except (ValueError, TypeError, KeyError, frappe.ValidationError) as e:
         handle_api_error(invoice_number, e)
 
+def reporting_api_xml_purchase_invoice_simplified(
+    uuid1, encoded_hash, signed_xmlfile_name, invoice_number, purchase_invoice_doc
+):
+    """Reporting API based on the API data and payload."""
+    try:
+        company_abbr = frappe.db.get_value(
+            "Company", {"name": purchase_invoice_doc.company}, "abbr"
+        )
+        if not company_abbr:
+            frappe.throw(
+                f"Company with abbreviation {purchase_invoice_doc.company} not found."
+            )
+
+        company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
+        if not company_doc.is_group and company_doc.custom_costcenter and company_doc.parent_company:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            if not company_doc.abbr:
+                frappe.throw(
+                    f"Company with abbreviation {company_doc.name} not found."
+                )
+            company_abbr = company_doc.abbr
+        production_csid = get_production_csid(purchase_invoice_doc, company_doc)
+        headers = get_headers(production_csid)
+        payload = {
+            "invoiceHash": encoded_hash,
+            "uuid": uuid1,
+            "invoice": xml_base64_decode(signed_xmlfile_name),
+        }
+
+        send_request_and_handle_response(
+            company_abbr,
+            invoice_number,
+            payload,
+            headers,
+            purchase_invoice_doc,
+            encoded_hash,
+            uuid1,
+        )
+
+    except (ValueError, TypeError, KeyError, frappe.ValidationError) as e:
+        handle_api_error(invoice_number, e)
+
 
 def get_production_csid(sales_invoice_doc, company_doc):
     """get production csid"""
@@ -319,6 +361,26 @@ def submit_sales_invoice_simplifeid(sales_invoice_doc, file_path, invoice_number
             frappe.local.site + file_path,
             invoice_number,
             sales_invoice_doc,
+        )
+
+    except Exception as e:
+        frappe.throw(f"Error in submitting sales in simplifed: {str(e)}")
+
+
+def submit_purchase_invoice_simplifeid(purchase_invoice_doc, file_path, invoice_number):
+    """submit purchase invoice with xml qr"""
+    try:
+        uuid1, encoded_hash = extract_uuid_and_invoicehash_simplifeid(file_path)
+
+        if "error" in uuid1:
+            frappe.throw(uuid1["error"])
+
+        reporting_api_xml_purchase_invoice_simplified(
+            uuid1,
+            encoded_hash,
+            frappe.local.site + file_path,
+            invoice_number,
+            purchase_invoice_doc,
         )
 
     except Exception as e:

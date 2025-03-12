@@ -39,6 +39,7 @@
     "parenttype": "Report",
     "role": "Sales User"
    }
-  ]
+  ],
+  "timeout": 0
  }
 ]
