@@ -76,24 +76,28 @@ frappe.realtime.on('hide_gif', () => {
 frappe.ui.form.on("Sales Invoice", {
     refresh: function (frm) {
         if (frm.doc.docstatus === 1 && !["CLEARED", "REPORTED"].includes(frm.doc.custom_zatca_status)) {
-            frm.add_custom_button(__("Send invoice to Zatca"), function () {
-                frm.call({
-                    method: "zatca_erpgulf.zatca_erpgulf.sign_invoice.zatca_background",
-                    args: {
-                        "invoice_number": frm.doc.name,
-                        "source_doc": frm.doc
+            frappe.db.get_value("Company", frm.doc.company, "country").then((r)=>{
+                if(r.message && r.message.country === "Saudi Arabia"){
 
-                    },
-                    callback: function (r) {
+                    frm.add_custom_button(__("Send invoice to Zatca"), function () {
+                        frm.call({
+                            method: "zatca_erpgulf.zatca_erpgulf.sign_invoice.zatca_background",
+                            args: {
+                                "invoice_number": frm.doc.name,
+                                "source_doc": frm.doc
 
-                        console.log("response.message");
-                        frm.reload_doc();
+                            },
+                            callback: function (r) {
 
-                    }
+                                console.log("response.message");
+                                frm.reload_doc();
 
+                            }
+                        })
+                    }, __("Zatca Phase-2"));
 
-                });
-            }, __("Zatca Phase-2"));
+                }
+            })
         }
         frm.page.add_menu_item(__('Print PDF-A3'), function () {
             // Create a dialog box with fields for Print Format, Letterhead, and Language
@@ -164,6 +168,29 @@ frappe.ui.form.on("Sales Invoice", {
 
 
 
+    },
+    company: function(frm){
+        if(frm.doc.company){
+            frappe.db.get_value("Company", frm.doc.company , 'country').then((r)=>{
+
+                if(r.message.country == "Saudi Arabia"){
+
+                    frm.set_df_property('custom_zatca_third_party_invoice', 'hidden' , 0);
+                    frm.set_df_property('custom_zatca_nominal_invoice', 'hidden' , 0);
+                    frm.set_df_property('custom_zatca_export_invoice','hidden',0);
+                    frm.set_df_property('custom_summary_invoice','hidden',0);
+                    frm.set_df_property('custom_self_billed_invoice','hidden',0);
+
+                }else{
+                    frm.set_df_property('custom_zatca_third_party_invoice' , 'hidden' , 1);
+                    frm.set_df_property('custom_zatca_nominal_invoice', 'hidden' , 1);
+                    frm.set_df_property('custom_zatca_export_invoice','hidden',1);
+                    frm.set_df_property('custom_summary_invoice','hidden',1);
+                    frm.set_df_property('custom_self_billed_invoice','hidden',1);
+                }
+            })
+
+        }
     }
 });
 
