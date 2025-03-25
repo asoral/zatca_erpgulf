@@ -176,3 +176,38 @@ frappe.ui.form.on("Company", {
 
     }
 });
+
+
+frappe.ui.form.on("Company",{
+
+
+    refresh : function(frm){
+
+        if(frm.doc.country != "Saudi Arabia"){
+
+            frm.set_df_property('custom_registration_type' ,'hidden' , 1);
+            frm.set_df_property('custom_company_registration','hidden',1);
+            frm.set_df_property('custom_zatca__location_for_csr_configuratoin' ,'hidden' , 1);
+            frm.set_df_property('custom_zatca__company_category_for_csr_configuration' , 'hidden' ,1);
+        }
+
+    },
+
+    country : function(frm){
+
+        if(frm.doc.country === "Saudi Arabia"){
+
+            frm.set_df_property('custom_registration_type' ,'hidden' , 0);
+            frm.set_df_property('custom_company_registration','hidden',0);
+            frm.set_df_property('custom_zatca__location_for_csr_configuratoin' ,'hidden' , 0);
+            frm.set_df_property('custom_zatca__company_category_for_csr_configuration' , 'hidden' ,0);
+        }
+        else{
+            frm.set_df_property('custom_registration_type' ,'hidden' , 1);
+            frm.set_df_property('custom_company_registration', 'hidden' ,1);
+            frm.set_df_property('custom_zatca__location_for_csr_configuratoin','hidden' ,1);
+            frm.set_df_property('custom_zatca__company_category_for_csr_configuration', 'hidden' ,1);
+            
+        }
+    }
+})
