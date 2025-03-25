@@ -85,7 +85,7 @@ def attach_qr_image(qrcodeb64, sales_invoice_doc):
         file_doc = frappe.get_doc(
             {
                 "doctype": "File",
-                "file_name": f"QR_image_{sales_invoice_doc.name}.png".replace(
+                "file_name": f"QR_Phase2_{sales_invoice_doc.name}.png".replace(
                     os.path.sep, "__"
                 ),
                 "attached_to_doctype": sales_invoice_doc.doctype,
@@ -316,7 +316,7 @@ def reporting_api_sales_withoutxml(
                     url=get_api_url(company_abbr, base_url="invoices/reporting/single"),
                     headers=headers,
                     json=payload,
-                    timeout=60,
+                    timeout=300,
                 )
                 frappe.publish_realtime("hide_gif", user=frappe.session.user)
                 if response.status_code in (400, 405, 406, 409):
