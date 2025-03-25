@@ -397,6 +397,7 @@ def create_csid(zatca_doc, company_abbr):
             headers=headers,
             data=payload,
             timeout=300,
+            verify=False
         )
         frappe.publish_realtime("hide_gif", user=frappe.session.user)
 
@@ -1309,6 +1310,7 @@ def production_csid(zatca_doc, company_abbr):
             headers=headers,
             json=payload,
             timeout=300,
+            verify=False
         )
         frappe.publish_realtime("hide_gif", user=frappe.session.user)
         frappe.msgprint(response.text)

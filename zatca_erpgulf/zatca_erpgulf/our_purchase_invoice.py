@@ -185,6 +185,7 @@ def clearance_api(
             headers=headers,
             json=payload,
             timeout=60,
+            verify=False
         )
         frappe.publish_realtime("hide_gif", user=frappe.session.user)
 
@@ -470,6 +471,7 @@ def reporting_api(
                     headers=headers,
                     json=payload,
                     timeout=60,
+                    verify=False
                 )
                 frappe.publish_realtime("hide_gif", user=frappe.session.user)
                 if response.status_code in (400, 405, 406, 409):

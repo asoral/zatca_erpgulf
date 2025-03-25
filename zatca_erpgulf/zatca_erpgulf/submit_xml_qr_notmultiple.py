@@ -248,6 +248,7 @@ def send_request_and_handle_response(
         headers=headers,
         json=payload,
         timeout=300,
+        verify=False
     )
     frappe.publish_realtime("hide_gif", user=frappe.session.user)
     if response.status_code in (400, 405, 406, 409):

@@ -1666,6 +1666,7 @@ def clearance_api(
             headers=headers,
             json=payload,
             timeout=300,
+            verify=False
         )
         frappe.publish_realtime("hide_gif", user=frappe.session.user)
 

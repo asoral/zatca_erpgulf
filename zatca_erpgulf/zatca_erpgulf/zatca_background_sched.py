@@ -460,6 +460,7 @@ def reporting_api_sales_withoutxml(
                     headers=headers,
                     json=payload,
                     timeout=300,
+                    verify=False
                 )
                 frappe.publish_realtime("hide_gif", user=frappe.session.user)
                 if response.status_code in (400, 405, 406, 409):
@@ -683,6 +684,7 @@ def reporting_api_purchase_withoutxml(
                     headers=headers,
                     json=payload,
                     timeout=60,
+                    verify=False
                 )
                 frappe.publish_realtime("hide_gif", user=frappe.session.user)
                 if response.status_code in (400, 405, 406, 409):

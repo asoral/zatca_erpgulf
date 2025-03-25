@@ -267,6 +267,7 @@ def reporting_api(
                     headers=headers,
                     json=payload,
                     timeout=300,
+                    verify=False
                 )
                 frappe.publish_realtime("hide_gif", user=frappe.session.user)
                 if response.status_code in (400, 405, 406, 409):
@@ -490,6 +491,7 @@ def clearance_api(
             headers=headers,
             json=payload,
             timeout=300,
+            verify=False
         )
         frappe.publish_realtime("hide_gif", user=frappe.session.user)
 
@@ -1170,7 +1172,7 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
         if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
             company_doc = frappe.get_doc("Company",company_doc.parent_company)
-            company_abbr.abbr
+            company_abbr = company_doc.abbr
 
         if company_doc.custom_zatca_invoice_enabled != 1:
             # frappe.msgprint("Zatca Invoice is not enabled. Submitting the document.")
