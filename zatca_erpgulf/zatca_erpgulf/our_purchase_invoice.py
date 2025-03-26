@@ -995,7 +995,7 @@ def zatca_background(invoice_number, source_doc, bypass_background_check=False):
                         source_doc=source_doc,
                         queue="default",
                         at_front = True,
-                        now = True
+                        # now = True
                     )
 
 
