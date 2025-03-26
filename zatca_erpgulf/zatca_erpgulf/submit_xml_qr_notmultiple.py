@@ -8,7 +8,7 @@ from lxml import etree
 CONTENT_TYPE_JSON = "application/json"
 NOT_SUBMITTED = "Not Submitted"
 SALES_INVOICE = "Sales Invoice"
-
+PURCHASE_INVOICE = "Purchase Invoice"
 
 def xml_base64_decode(signed_xmlfile_name):
     """xml base64 decode"""
@@ -189,7 +189,7 @@ def reporting_api_xml_purchase_invoice_simplified(
             "invoice": xml_base64_decode(signed_xmlfile_name),
         }
 
-        send_request_and_handle_response(
+        send_request_and_handle_response_for_purchase_invoice(
             company_abbr,
             invoice_number,
             payload,
@@ -226,7 +226,55 @@ def get_headers(production_csid):
         "Content-Type": CONTENT_TYPE_JSON,
         "Cookie": "TS0106293e=0132a679c0639d13d069bcba831384623a2ca6da47fac8d91bef610c47c7119dcdd3b817f963ec301682dae864351c67ee3a402866",
     }
-
+def send_request_and_handle_response_for_purchase_invoice(
+    company_abbr,
+    invoice_number,
+    payload,
+    headers,
+    sales_invoice_doc,
+    encoded_hash,
+    uuid1,
+):
+    """send_request_and_handle_response"""
+    frappe.publish_realtime(
+        "show_gif",
+        {"gif_url": "/assets/zatca_erpgulf/js/loading.gif"},
+        user=frappe.session.user,
+    )
+    response = requests.post(
+        url=get_api_url(company_abbr, base_url="invoices/reporting/single"),
+        headers=headers,
+        json=payload,
+        timeout=300,
+        verify=False
+    )
+    frappe.publish_realtime("hide_gif", user=frappe.session.user)
+    if response.status_code in (400, 405, 406, 409):
+        handle_failed_submission_for_purchase_invoice(
+            invoice_number,
+            response,
+            "Error: The request you are sending to Zatca is in incorrect format."
+            " Please report to system administrator.",
+        )
+    elif response.status_code in (401, 403, 407, 451):
+        handle_failed_submission_for_purchase_invoice(
+            invoice_number,
+            response,
+            "Error: Zatca Authentication failed. "
+            "Your access token may be expired or not valid."
+            " Please contact your system administrator.",
+        )
+    elif response.status_code not in (200, 202):
+        handle_failed_submission_for_purchase_invoice(
+            invoice_number,
+            response,
+            "Error: Zatca server busy or not responding."
+            " Try after sometime or contact your system administrator.",
+        )
+    else:
+        handle_successful_submission_for_purchase_invoice(
+            invoice_number, response, sales_invoice_doc, encoded_hash, uuid1
+        )
 
 def send_request_and_handle_response(
     company_abbr,
@@ -286,6 +334,12 @@ def handle_failed_submission(invoice_number, response, error_message):
         f"{error_message} Status code: {response.status_code}<br><br>{response.text}"
     )
 
+def handle_failed_submission_for_purchase_invoice(invoice_number, response, error_message):
+    """handle_failed_submission"""
+    update_invoice_status_for_purchase_invoice(invoice_number, NOT_SUBMITTED)
+    frappe.throw(
+        f"{error_message} Status code: {response.status_code}<br><br>{response.text}"
+    )
 
 def handle_successful_submission(
     invoice_number, response, sales_invoice_doc, encoded_hash, uuid1
@@ -304,10 +358,40 @@ def handle_successful_submission(
     update_invoice_status(invoice_number, "REPORTED", uuid1, msg)
     success_log(response.text, uuid1, invoice_number)
 
+def handle_successful_submission_for_purchase_invoice(
+    invoice_number, response, sales_invoice_doc, encoded_hash, uuid1
+):
+    """handle_successful_submission"""
+    msg = (
+        "SUCCESS: <br><br>"
+        if response.status_code == 200
+        else "REPORTED WITH WARNINGS: <br><br> Please copy the below message"
+        " and send it to your system administrator "
+        "to fix this warnings before next submission <br><br>"
+    )
+    msg += f"Status Code: {response.status_code}<br><br> Zatca Response: {response.text}<br><br>"
+
+    update_company_or_pos_settings(sales_invoice_doc, encoded_hash, msg)
+    update_invoice_status_for_purchase_invoice(invoice_number, "REPORTED", uuid1, msg)
+    success_log(response.text, uuid1, invoice_number)
 
 def update_invoice_status(invoice_number, status, uuid1=None, msg=None):
     """update_invoice_status"""
     invoice_doc = frappe.get_doc(SALES_INVOICE, invoice_number)
+    invoice_doc.db_set(
+        "custom_uuid", uuid1 or NOT_SUBMITTED, commit=True, update_modified=True
+    )
+    invoice_doc.db_set("custom_zatca_status", status, commit=True, update_modified=True)
+    invoice_doc.db_set(
+        "custom_zatca_full_response",
+        msg or NOT_SUBMITTED,
+        commit=True,
+        update_modified=True,
+    )
+
+def update_invoice_status_for_purchase_invoice(invoice_number, status, uuid1=None, msg=None):
+    """update_invoice_status"""
+    invoice_doc = frappe.get_doc(PURCHASE_INVOICE, invoice_number)
     invoice_doc.db_set(
         "custom_uuid", uuid1 or NOT_SUBMITTED, commit=True, update_modified=True
     )
