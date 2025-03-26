@@ -410,8 +410,10 @@ def digital_signature(hash1, company_abbr, source_doc):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+
         if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
             company_doc = frappe.get_doc("Company",company_doc.parent_company)
+        print("company name:----->1", company_doc.name)
         private_key_data_str = company_doc.get("custom_private_key")
 
         if not private_key_data_str:

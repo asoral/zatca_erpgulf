@@ -21,7 +21,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 import requests
 import asn1
 
-SUPPORTED_INVOICES = ["Sales Invoice", "POS Invoice"]
+SUPPORTED_INVOICES = ["Sales Invoice", "POS Invoice", "Purchase Invoice"]
 
 
 def encode_customoid(custom_string):
