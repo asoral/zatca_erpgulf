@@ -954,13 +954,24 @@ def zatca_background_(invoice_number, source_doc, bypass_background_check=False)
                         source_doc,
                     )
                 else:
-                    zatca_call(
-                        invoice_number,
-                        "0",
-                        any_item_has_tax_template,
-                        company_abbr,
-                        source_doc,
+                    frappe.enqueue(
+                        "zatca_erpgulf.zatca_erpgulf.pos_sign.zatca_call",
+                        invoice_number=invoice_number,
+                        compliance_type="0",
+                        any_item_has_tax_template=any_item_has_tax_template,
+                        company_abbr=company_abbr,
+                        source_doc=source_doc,
+                        queue="default",
+                        at_front = True,
+                        now = True
                     )
+                    # zatca_call(
+                    #     invoice_number,
+                    #     "0",
+                    #     any_item_has_tax_template,
+                    #     company_abbr,
+                    #     source_doc,
+                    # )
         else:
             create_qr_code(pos_invoice_doc, method=None)
 
@@ -1174,14 +1185,33 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
                         source_doc,
                     )
                 else:
-                    # Handle the case where custom_unique_id is missing
-                    zatca_call(
-                        invoice_number,
-                        "0",
-                        any_item_has_tax_template,
-                        company_abbr,
-                        source_doc,
+                    frappe.enqueue(
+                        "zatca_erpgulf.zatca_erpgulf.pos_sign.zatca_call",
+                        invoice_number=invoice_number,
+                        compliance_type="0",
+                        any_item_has_tax_template=any_item_has_tax_template,
+                        company_abbr=company_abbr,
+                        source_doc=source_doc,
+                        queue="default",
+                        at_front = True,
+                        now = True
                     )
+                    # frappe.enqueue(
+                    #     method = attach_pdf_on_submit,
+                    #     doc = doc,
+                        # at_front = True,
+                        # now = True
+                    # )
+
+                    # Handle the case where custom_unique_id is missing
+                    # zatca_call(
+                    #     invoice_number,
+                    #     "0",
+                    #     any_item_has_tax_template,
+                    #     company_abbr,
+                    #     source_doc,
+                    # )
+
         else:
             # If not Phase-2, create a QR code
             create_qr_code(pos_invoice_doc, method=None)
