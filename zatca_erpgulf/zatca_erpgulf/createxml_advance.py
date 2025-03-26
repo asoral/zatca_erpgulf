@@ -51,6 +51,8 @@ def get_csr_data(company_abbr):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
         csr_config_string = company_doc.custom_csr_config
 
         if not csr_config_string:
@@ -89,6 +91,8 @@ def create_private_keys(company_abbr, zatca_doc):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
 
         private_key = ec.generate_private_key(ec.SECP256K1(), backend=default_backend())
         private_key_pem = private_key.private_bytes(
@@ -121,6 +125,8 @@ def create_csr(zatca_doc, portal_type, company_abbr):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
         csr_values = get_csr_data(company_abbr)
 
         company_csr_data = csr_values
@@ -216,6 +222,8 @@ def get_api_url(company_abbr, base_url):
     """There are many api susing in zatca which can be defined by a feild in settings"""
     try:
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
         if company_doc.custom_select == "Sandbox":
             url = company_doc.custom_sandbox_url + base_url
         elif company_doc.custom_select == "Simulation":
@@ -240,6 +248,8 @@ def create_csid(zatca_doc, company_abbr):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
 
         csr_data_str = company_doc.get("custom_csr_data", "")
 
@@ -306,6 +316,8 @@ def create_public_key(company_abbr, source_doc):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
         certificate_data_str = company_doc.get("custom_certificate", "")
 
         if not certificate_data_str:
@@ -398,6 +410,8 @@ def digital_signature(hash1, company_abbr, source_doc):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
         private_key_data_str = company_doc.get("custom_private_key")
 
         if not private_key_data_str:
@@ -425,6 +439,8 @@ def extract_certificate_details(company_abbr, source_doc):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
 
         certificate_data_str = company_doc.get("custom_certificate")
 
@@ -465,6 +481,8 @@ def certificate_hash(company_abbr, source_doc):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
 
         certificate_data_str = company_doc.get("custom_certificate", "")
 
@@ -607,6 +625,8 @@ def populate_the_ubl_extensions_output(
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
         certificate_data_str = company_doc.get("custom_certificate")
 
         if not certificate_data_str:
@@ -651,6 +671,8 @@ def extract_public_key_data(company_abbr, source_doc):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
 
         public_key_pem = company_doc.get("custom_public_key", "")
         if not public_key_pem:
@@ -716,6 +738,8 @@ def tag9_signature_ecdsa(company_abbr, source_doc):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
 
         certificate_content = company_doc.custom_certificate or ""
 
@@ -925,6 +949,8 @@ def compliance_api_call(
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
         payload = json.dumps(
             {
                 "invoiceHash": encoded_hash,
@@ -981,6 +1007,8 @@ def production_csid(zatca_doc, company_abbr):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_doc = frappe.get_doc("Company",company_doc.parent_company)
         csid = company_doc.custom_basic_auth_from_csid
         request_id = company_doc.custom_compliance_request_id_
 
