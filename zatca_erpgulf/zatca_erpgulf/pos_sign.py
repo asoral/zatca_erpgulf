@@ -962,8 +962,8 @@ def zatca_background_(invoice_number, source_doc, bypass_background_check=False)
                         company_abbr=company_abbr,
                         source_doc=source_doc,
                         queue="default",
-                        at_front = True,
-                        now = True
+                        # at_front = True,
+                        # now = True
                     )
                     # zatca_call(
                     #     invoice_number,
@@ -1193,8 +1193,8 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
                         company_abbr=company_abbr,
                         source_doc=source_doc,
                         queue="default",
-                        at_front = True,
-                        now = True
+                        # at_front = True,
+                        # now = True
                     )
                     # frappe.enqueue(
                     #     method = attach_pdf_on_submit,
