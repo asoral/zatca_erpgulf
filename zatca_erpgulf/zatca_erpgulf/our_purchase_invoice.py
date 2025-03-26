@@ -978,7 +978,7 @@ def zatca_background(invoice_number, source_doc, bypass_background_check=False):
                         "zatca_erpgulf.zatca_erpgulf.our_purchase_invoice.submit_purchase_invoice_simplifeid",
                         purchase_invoice_doc = purchase_invoice_doc,
                         file_path = custom_xml_field, 
-                        invoice_number = invoice_number
+                        invoice_number = invoice_number,
                         queue="default"
                     )
                 elif (
