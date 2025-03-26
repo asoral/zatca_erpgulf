@@ -993,9 +993,7 @@ def zatca_background(invoice_number, source_doc, bypass_background_check=False):
                         any_item_has_tax_template=any_item_has_tax_template,
                         company_abbr=company_abbr,
                         source_doc=source_doc,
-                        queue="default",
-                        # at_front = True,
-                        # now = True
+                        queue="default"
                     )
 
 
@@ -1210,9 +1208,7 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
                         any_item_has_tax_template=any_item_has_tax_template,
                         company_abbr=company_abbr,
                         source_doc=source_doc,
-                        queue="default",
-                        # at_front = True,
-                        # now = True
+                        queue="default"
                     )
 
                     # zatca_call(
