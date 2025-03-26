@@ -1196,12 +1196,7 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
                         # at_front = True,
                         # now = True
                     )
-                    # frappe.enqueue(
-                    #     method = attach_pdf_on_submit,
-                    #     doc = doc,
-                        # at_front = True,
-                        # now = True
-                    # )
+                 
 
                     # Handle the case where custom_unique_id is missing
                     # zatca_call(
