@@ -200,7 +200,7 @@ def reporting_api_xml_purchase_invoice_simplified(
         )
 
     except (ValueError, TypeError, KeyError, frappe.ValidationError) as e:
-        handle_api_error(invoice_number, e)
+        handle_api_error_for_purchase_invoice(invoice_number, e)
 
 
 def get_production_csid(sales_invoice_doc, company_doc):
