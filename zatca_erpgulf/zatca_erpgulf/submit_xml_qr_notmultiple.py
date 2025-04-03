@@ -431,7 +431,12 @@ def handle_api_error(invoice_number, error):
         f"Error in reporting API-1 sales invoice with XML simplified: {str(error)}"
     )
 
-
+def handle_api_error_for_purchase_invoice(invoice_number, error):
+    """handle_api_error"""
+    update_invoice_status_for_purchase_invoice(invoice_number, NOT_SUBMITTED, msg=f"Error: {str(error)}")
+    frappe.throw(
+        f"Error in reporting API-1 sales invoice with XML simplified: {str(error)}"
+    )
 def submit_sales_invoice_simplifeid(sales_invoice_doc, file_path, invoice_number):
     """submit sales invoice with xml qr"""
     try:
