@@ -493,6 +493,8 @@ def clearance_api(
             timeout=300,
             verify=False
         )
+        print("responsedfvjhfdhjfd",response)
+        print("response status code--",response.status_code)
         frappe.publish_realtime("hide_gif", user=frappe.session.user)
 
         if response.status_code in (400, 405, 406, 409):
@@ -677,6 +679,9 @@ def zatca_call(
         company_abbr = frappe.db.get_value(
             "Company", {"name": sales_invoice_doc.company}, "abbr"
         )
+        # td = frappe.new_doc("ToDo")
+        # td.description = company_abbr
+        # td.save()
         company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
         if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
             company_abbr = frappe.db.get_value(
@@ -961,6 +966,7 @@ def zatca_background(invoice_number, source_doc, bypass_background_check=False):
             settings = frappe.get_doc("Company", settings.parent_company)
             
         company_abbr = settings.abbr
+        
 
         if (
             sales_invoice_doc.taxes
@@ -1415,3 +1421,284 @@ def resubmit_invoices(invoice_numbers, bypass_background_check=False):
             # Log errors and add to the results
 
     return results
+
+
+
+@frappe.whitelist()
+def generate_qr(invoice_number):
+
+    print("=====================>generate_qr",invoice_number)
+    
+    sales_invoice_doc = frappe.get_doc("Sales Invoice", invoice_number)
+    source_doc = sales_invoice_doc
+
+    company_abbr = frappe.db.get_value(
+        "Company", {"name": sales_invoice_doc.company}, "abbr"
+    )
+
+    company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
+
+    # if not group, and parent company & costcenter exist → use parent company abbr
+    if (
+        not company_doc.is_group
+        and company_doc.parent_company
+        and company_doc.custom_costcenter
+    ):
+        company_abbr = frappe.db.get_value(
+            "Company", {"name": company_doc.parent_company}, "abbr"
+        )
+        
+    customer_doc = frappe.get_doc("Customer", sales_invoice_doc.customer)
+   
+    tlv_data = generate_tlv_xml(company_abbr, source_doc)
+
+    # Convert TLV → bytes
+    
+    tagsbufsarray = []
+    for tag_num, tag_value in tlv_data.items():
+        tagsbufsarray.append(get_tlv_for_value(tag_num, tag_value))
+
+    qrcodebuf = b"".join(tagsbufsarray)
+
+    # Convert to Base64 QR
+    
+    qrcodeb64 = base64.b64encode(qrcodebuf).decode("utf-8")
+    print("qrcodeb64:---->", qrcodeb64)  
+    
+    update_qr_toxml(qrcodeb64, company_abbr)    
+    
+   
+    attach_qr_image__(qrcodeb64, sales_invoice_doc)
+
+
+def attach_qr_image__(qrcodeb64, sales_invoice_doc):
+    """attach the qr image"""
+    try:
+        if not hasattr(sales_invoice_doc, "ksa_einv_qr"):
+            create_custom_fields(
+                {
+                    sales_invoice_doc.doctype: [
+                        {
+                            "fieldname": "ksa_einv_qr",
+                            "label": "KSA E-Invoicing QR",
+                            "fieldtype": "Attach Image",
+                            "read_only": 1,
+                            "no_copy": 1,
+                            "hidden": 0,  # Set hidden to 0 for testing
+                        }
+                    ]
+                }
+            )
+            frappe.log("Custom field 'ksa_einv_qr' created.")
+        qr_code = sales_invoice_doc.get("ksa_einv_qr")
+        # if qr_code and frappe.db.exists({"doctype": "File", "file_url": qr_code}):
+        #     return
+        qr_image = io.BytesIO()
+        qr = qr_create(qrcodeb64, error="L")
+        qr.png(qr_image, scale=8, quiet_zone=1)
+
+        file_doc = frappe.get_doc(
+            {
+                "doctype": "File",
+                "file_name": f"QR_Phase2_{sales_invoice_doc.name}.png".replace(
+                    os.path.sep, "__"
+                ),
+                "attached_to_doctype": sales_invoice_doc.doctype,
+                "attached_to_name": sales_invoice_doc.name,
+                "is_private": 1,
+                "content": qr_image.getvalue(),
+                "attached_to_field": "ksa_einv_qr",
+            }
+        )
+        file_doc.save(ignore_permissions=True)
+        sales_invoice_doc.db_set("ksa_einv_qr", file_doc.file_url)
+        sales_invoice_doc.notify_update()
+
+    except (ValueError, TypeError, KeyError, frappe.ValidationError) as e:
+        frappe.throw(("attach qr images" f"error: {str(e)}"))
+
+
+
+@frappe.whitelist()
+def zatca_call_new(
+    invoice_number,
+    compliance_type="0",
+    any_item_has_tax_template=False,
+    company_abbr=None,
+    source_doc=None,
+):
+    """zatca call which includes the function calling and validation reguarding the api and
+    based on this the zATCA output and message is getting"""
+    try:
+        source_doc=frappe.get_doc("Sales Invoice", invoice_number)
+        if not frappe.db.exists("Sales Invoice", invoice_number):
+            frappe.throw("Invoice Number is NOT Valid: " + str(invoice_number))
+        invoice = xml_tags()
+        invoice, uuid1, sales_invoice_doc = salesinvoice_data(invoice, invoice_number)
+        # Get the company abbreviation
+        company_abbr = frappe.db.get_value(
+            "Company", {"name": sales_invoice_doc.company}, "abbr"
+        )
+        company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
+        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+            company_abbr = frappe.db.get_value(
+                "Company", {"name": company_doc.parent_company}, "abbr"
+            )
+        customer_doc = frappe.get_doc("Customer", sales_invoice_doc.customer)
+        if compliance_type == "0":
+            if customer_doc.custom_b2c == 1:
+                invoice = invoice_typecode_simplified(invoice, sales_invoice_doc)
+            else:
+                invoice = invoice_typecode_standard(invoice, sales_invoice_doc)
+        else:
+            invoice = invoice_typecode_compliance(invoice, compliance_type)
+        invoice = doc_reference(invoice, sales_invoice_doc, invoice_number)
+        invoice = additional_reference(invoice, company_abbr, sales_invoice_doc)
+        invoice = company_data(invoice, sales_invoice_doc)
+        invoice = customer_data(invoice, sales_invoice_doc)
+        invoice = delivery_and_payment_means(
+            invoice, sales_invoice_doc, sales_invoice_doc.is_return
+        )
+        if sales_invoice_doc.custom_zatca_nominal_invoice == 1:
+            invoice = add_nominal_discount_tax(invoice, sales_invoice_doc)
+        elif not any_item_has_tax_template:
+            invoice = add_document_level_discount_with_tax(invoice, sales_invoice_doc)
+        else:
+            # Add document-level discount with tax template
+            invoice = add_document_level_discount_with_tax_template(
+                invoice, sales_invoice_doc
+            )
+        if sales_invoice_doc.custom_zatca_nominal_invoice == 1:
+            if not any_item_has_tax_template:
+                invoice = tax_data_nominal(invoice, sales_invoice_doc)
+            else:
+                invoice = tax_data_with_template_nominal(invoice, sales_invoice_doc)
+        else:
+            if not any_item_has_tax_template:
+                invoice = tax_data(invoice, sales_invoice_doc)
+            else:
+                invoice = tax_data_with_template(invoice, sales_invoice_doc)
+        if not any_item_has_tax_template:
+            invoice = item_data(invoice, sales_invoice_doc)
+        else:
+            invoice = item_data_with_template(invoice, sales_invoice_doc)
+        xml_structuring(invoice)
+        try:
+            with open(
+                frappe.local.site + "/private/files/finalzatcaxml.xml",
+                "r",
+                encoding="utf-8",
+            ) as file:
+                file_content = file.read()
+        except FileNotFoundError:
+            frappe.throw("XML file not found")
+        tag_removed_xml = removetags(file_content)
+        canonicalized_xml = canonicalize_xml(tag_removed_xml)
+        hash1, encoded_hash = getinvoicehash(canonicalized_xml)
+        encoded_signature = digital_signature(hash1, company_abbr, source_doc)
+        issuer_name, serial_number = extract_certificate_details(
+            company_abbr, source_doc
+        )
+        encoded_certificate_hash = certificate_hash(company_abbr, source_doc)
+        namespaces, signing_time = signxml_modify(company_abbr, source_doc)
+        signed_properties_base64 = generate_signed_properties_hash(
+            signing_time, issuer_name, serial_number, encoded_certificate_hash
+        )
+        populate_the_ubl_extensions_output(
+            encoded_signature,
+            namespaces,
+            signed_properties_base64,
+            encoded_hash,
+            company_abbr,
+            source_doc,
+        )
+        tlv_data = generate_tlv_xml(company_abbr, source_doc)
+        tagsbufsarray = []
+        for tag_num, tag_value in tlv_data.items():
+            tagsbufsarray.append(get_tlv_for_value(tag_num, tag_value))
+        qrcodebuf = b"".join(tagsbufsarray)
+        qrcodeb64 = base64.b64encode(qrcodebuf).decode("utf-8")
+        update_qr_toxml(qrcodeb64, company_abbr)
+        signed_xmlfile_name = structuring_signedxml()
+        # Example usage
+        # file_path = generate_invoice_pdf(
+        #     invoice_number, l anguage="en", letterhead="Sample letterhead"
+        # )
+        # frappe.throw(f"PDF saved at: {file_path}")
+        if compliance_type == "0":
+            if customer_doc.custom_b2c == 1:
+                attach_qr_image___(qrcodeb64, sales_invoice_doc)
+                # reporting_api(
+                #     uuid1,
+                #     encoded_hash,
+                #     signed_xmlfile_name,
+                #     invoice_number,
+                #     sales_invoice_doc,
+                # )
+            else:
+                # clearance_api(
+                #     uuid1,
+                #     encoded_hash,
+                #     signed_xmlfile_name,
+                #     invoice_number,
+                #     sales_invoice_doc,
+                # )
+                attach_qr_image___(qrcodeb64, sales_invoice_doc)
+        else:
+            # compliance_api_call(
+            #     uuid1,
+            #     encoded_hash,
+            #     signed_xmlfile_name,
+            #     company_abbr,
+            #     source_doc,
+            # )
+            attach_qr_image___(qrcodeb64, sales_invoice_doc)
+    except (ValueError, TypeError, KeyError, frappe.ValidationError) as e:
+        frappe.log_error(
+            title="Zatca invoice call failed",
+            message=f"{frappe.get_traceback()}\nError: {str(e)}",
+        )
+def attach_qr_image___(qrcodeb64, sales_invoice_doc):
+    """attach the qr image"""
+    try:
+        if not hasattr(sales_invoice_doc, "ksa_einv_qr"):
+            create_custom_fields(
+                {
+                    sales_invoice_doc.doctype: [
+                        {
+                            "fieldname": "ksa_einv_qr",
+                            "label": "KSA E-Invoicing QR",
+                            "fieldtype": "Attach Image",
+                            "read_only": 1,
+                            "no_copy": 1,
+                            "hidden": 0,  # Set hidden to 0 for testing
+                        }
+                    ]
+                }
+            )
+            frappe.log("Custom field 'ksa_einv_qr' created.")
+        sales_invoice_doc.ksa_einv_qr=None
+        qr_code = sales_invoice_doc.get("ksa_einv_qr")
+        if qr_code and frappe.db.exists({"doctype": "File", "file_url": qr_code}):
+            return
+        qr_image = io.BytesIO()
+        qr = qr_create(qrcodeb64, error="L")
+        qr.png(qr_image, scale=8, quiet_zone=1)
+        file_doc = frappe.get_doc(
+            {
+                "doctype": "File",
+                "file_name": f"QR_Phase2_{sales_invoice_doc.name}.png".replace(
+                    os.path.sep, "__"
+                ),
+                "attached_to_doctype": sales_invoice_doc.doctype,
+                "attached_to_name": sales_invoice_doc.name,
+                "is_private": 1,
+                "content": qr_image.getvalue(),
+                "attached_to_field": "ksa_einv_qr",
+            }
+        )
+        file_doc.save(ignore_permissions=True)
+        sales_invoice_doc.db_set("ksa_einv_qr", file_doc.file_url)
+        sales_invoice_doc.notify_update()
+    except (ValueError, TypeError, KeyError, frappe.ValidationError) as e:
+        frappe.throw(("attach qr images" f"error: {str(e)}"))

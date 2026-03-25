@@ -432,6 +432,7 @@ def create_csid(zatca_doc, company_abbr):
 
 
 def create_public_key(company_abbr, source_doc):
+    print("trigggegyshfhjfdhjfdhghjgfhjfdghjfd-----------",company_abbr)
     """Create a public key based on the company abbreviation and source document."""
     try:
         # Get the company name using the provided abbreviation
@@ -440,22 +441,25 @@ def create_public_key(company_abbr, source_doc):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         # Fetch the company document
-        company_doc = frappe.get_doc("Company", company_name)
+        company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
         if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
             company_doc = frappe.get_doc("Company",company_doc.parent_company)
 
 
         # Initialize certificate_data_str based on the document type
+        print("compnay doc ---------------------------",company_doc.name,company_abbr)
         certificate_data_str = ""
 
         if source_doc:
             if source_doc.doctype in SUPPORTED_INVOICES:
                 if source_doc.custom_zatca_pos_name:
+                    print("entrybcbcjcddccdfhdkjfkfdgkfjdgdjkf----------")
                     # Fetch Zatca settings and use its certificate
 
                     zatca_settings = frappe.get_doc(
                         "Zatca Multiple Setting", source_doc.custom_zatca_pos_name
                     )
+                    print("zatka setting --------------",zatca_settings)
                     certificate_data_str = zatca_settings.get("custom_certficate", "")
                 else:
                     # Use company certificate as fallback
@@ -464,6 +468,7 @@ def create_public_key(company_abbr, source_doc):
                 certificate_data_str = company_doc.get("custom_certificate", "")
             else:
                 frappe.throw(f"Unsupported document type: {source_doc.doctype}")
+            print("certificate dadyasfdghfdgfdgdfhdfhdfhd",certificate_data_str)
 
         if not certificate_data_str:
             frappe.throw("No certificate data found.")
@@ -493,6 +498,7 @@ def create_public_key(company_abbr, source_doc):
                     )
 
                 zatca_settings.custom_public_key = public_key_pem
+
                 zatca_settings.save(ignore_permissions=True)
 
             else:
@@ -502,6 +508,7 @@ def create_public_key(company_abbr, source_doc):
                     )
 
                 company_doc.custom_public_key = public_key_pem
+                print("company name:---->", company_doc.name)
                 company_doc.save(ignore_permissions=True)
         elif source_doc.doctype == "Company":
             if not hasattr(company_doc, "custom_public_key"):
@@ -952,6 +959,7 @@ def get_tlv_for_value(tag_num, tag_value):
 def tag8_publickey(company_abbr, source_doc):
     """tag 8 of qr from public key"""
     try:
+        # frappe.msgprint(f"company abbr:---->{company_abbr}")
         create_public_key(company_abbr, source_doc)
         base64_encoded = extract_public_key_data(company_abbr, source_doc)
         byte_data = base64.b64decode(base64_encoded)
