@@ -4,6 +4,7 @@ Includes functions for XML parsing, API interactions, and custom handling.
 """
 
 from decimal import Decimal, ROUND_DOWN
+import json
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
 import frappe
@@ -592,6 +593,18 @@ def add_line_item_discount(cac_price, single_item, sales_invoice_doc):
         return None
 
 
+def get_tax_wise_detail(sales_invoice_doc, single_item):
+    """Return item-wise tax details compatible with Frappe v15/v16."""
+    if (
+        int(frappe.__version__.split(".", 1)[0]) == 16
+        and getattr(sales_invoice_doc, "item_wise_tax_details", None)
+    ):
+        tax_rate = float(f"{sales_invoice_doc.item_wise_tax_details[0].rate:.1f}")
+        tax_amount = sales_invoice_doc.item_wise_tax_details[0].amount
+        return json.dumps({single_item.item_code: [tax_rate, float(tax_amount)]})
+    return sales_invoice_doc.taxes[0].item_wise_tax_detail
+
+
 def item_data(invoice, sales_invoice_doc):
     """
     The function defines the xml creating without item tax template
@@ -600,7 +613,7 @@ def item_data(invoice, sales_invoice_doc):
         qty = "cbc:BaseQuantity"
         for single_item in sales_invoice_doc.items:
             _item_tax_amount, item_tax_percentage = get_tax_for_item(
-                sales_invoice_doc.taxes[0].item_wise_tax_detail, single_item.item_code
+                get_tax_wise_detail(sales_invoice_doc, single_item), single_item.item_code
             )
             cac_invoiceline = ET.SubElement(invoice, "cac:InvoiceLine")
             cbc_id_10 = ET.SubElement(cac_invoiceline, "cbc:ID")
