@@ -201,9 +201,12 @@ def reporting_api_pos_without_xml(
             "Company", {"name": pos_invoice_doc.company}, "abbr"
         )
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
-            company_abbr = company_doc.abbr
+        credential_context = get_zatca_credential_context(
+            get_zatca_company_context(pos_invoice_doc)
+        )
+        credential_company_doc = credential_context.get("credential_company_doc")
+        if credential_company_doc:
+            company_abbr = credential_company_doc.abbr
 
         if not company_abbr:
             frappe.throw(
