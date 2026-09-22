@@ -18,6 +18,7 @@ from pyqrcode import create as qr_create
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from zatca_erpgulf.zatca_erpgulf.zatca_context import (
     get_zatca_company_context,
+    get_zatca_credential_context,
     validate_zatca_invoice_before_submission,
 )
 from zatca_erpgulf.zatca_erpgulf.createxml import (
@@ -240,13 +241,10 @@ def reporting_api(
             }
         )
         file.save(ignore_permissions=True)
-        if sales_invoice_doc.custom_zatca_pos_name:
-            zatca_settings = frappe.get_doc(
-                "Zatca Multiple Setting", sales_invoice_doc.custom_zatca_pos_name
-            )
-            production_csid = zatca_settings.custom_final_auth_csid
-        else:
-            production_csid = company_doc.custom_basic_auth_from_production
+        credential_context = get_zatca_credential_context(
+            get_zatca_company_context(sales_invoice_doc)
+        )
+        production_csid = credential_context.get("csid") or ""
         if production_csid:
             headers = {
                 "accept": "application/json",
