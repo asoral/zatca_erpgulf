@@ -458,7 +458,7 @@ def create_public_key(company_abbr, source_doc):
                     # Fetch Zatca settings and use its certificate
 
                     zatca_settings = frappe.get_doc(
-                        "Zatca Multiple Setting", source_doc.custom_zatca_pos_name
+                        "ZATCA Multiple Setting", source_doc.custom_zatca_pos_name
                     )
                     print("zatka setting --------------",zatca_settings)
                     certificate_data_str = zatca_settings.get("custom_certficate", "")
@@ -490,7 +490,7 @@ def create_public_key(company_abbr, source_doc):
         if source_doc.doctype in SUPPORTED_INVOICES:
             if source_doc.custom_zatca_pos_name:
                 zatca_settings = frappe.get_doc(
-                    "Zatca Multiple Setting", source_doc.custom_zatca_pos_name
+                    "ZATCA Multiple Setting", source_doc.custom_zatca_pos_name
                 )
 
                 if not hasattr(zatca_settings, "custom_public_key"):
@@ -777,7 +777,7 @@ def populate_the_ubl_extensions_output(
                 if source_doc.custom_zatca_pos_name:
                     # Fetch Zatca settings and use its certificate
                     zatca_settings = frappe.get_doc(
-                        "Zatca Multiple Setting", source_doc.custom_zatca_pos_name
+                        "ZATCA Multiple Setting", source_doc.custom_zatca_pos_name
                     )
                     certificate_data_str = zatca_settings.get("custom_certficate")
                 else:
@@ -837,7 +837,7 @@ def extract_public_key_data(company_abbr, source_doc):
                 if source_doc.custom_zatca_pos_name:
                     # Fetch Zatca settings and use its certificate
                     zatca_settings = frappe.get_doc(
-                        "Zatca Multiple Setting", source_doc.custom_zatca_pos_name
+                        "ZATCA Multiple Setting", source_doc.custom_zatca_pos_name
                     )
                     public_key_pem = zatca_settings.get("custom_public_key", "")
                 else:
@@ -915,7 +915,7 @@ def tag9_signature_ecdsa(company_abbr, source_doc):
                 if source_doc.custom_zatca_pos_name:
                     # Fetch Zatca settings and use its certificate
                     zatca_settings = frappe.get_doc(
-                        "Zatca Multiple Setting", source_doc.custom_zatca_pos_name
+                        "ZATCA Multiple Setting", source_doc.custom_zatca_pos_name
                     )
                     certificate_content = zatca_settings.custom_certficate or ""
                 else:
@@ -1144,7 +1144,7 @@ def compliance_api_call(
             and source_doc.custom_zatca_pos_name
         ):
             zatca_settings = frappe.get_doc(
-                "Zatca Multiple Setting", source_doc.custom_zatca_pos_name
+                "ZATCA Multiple Setting", source_doc.custom_zatca_pos_name
             )
             csid = zatca_settings.custom_basic_auth_from_csid
         else:
