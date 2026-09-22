@@ -292,7 +292,7 @@ def reporting_api(
                     uuid=uuid1,
                     title=title,
                 )
-                if response.status_code in (400, 405, 406, 409):
+                if response.status_code in (400, 405, 406):
                     invoice_doc = frappe.get_doc("Sales Invoice", invoice_number)
                     invoice_doc.db_set(
                         "custom_uuid",
@@ -351,7 +351,7 @@ def reporting_api(
                         )
                     )
 
-                if response.status_code not in (200, 202):
+                if response.status_code not in (200, 202, 409):
                     invoice_doc = frappe.get_doc("Sales Invoice", invoice_number)
                     invoice_doc.db_set(
                         "custom_uuid",
@@ -567,7 +567,7 @@ def clearance_api(
                     f"{response.text}"
                 )
             )
-        if response.status_code not in (200, 202):
+        if response.status_code not in (200, 202, 409):
             invoice_doc = frappe.get_doc("Sales Invoice", invoice_number)
             invoice_doc.db_set(
                 "custom_uuid", "Not Submitted", commit=True, update_modified=True
