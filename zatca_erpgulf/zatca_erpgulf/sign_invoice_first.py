@@ -356,11 +356,11 @@ def create_csid(zatca_doc, company_abbr):
 
             company_doc = frappe.get_doc("Company", company_name)
             if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-                company_doc = frappe.get_doc("Company",company_doc.parent_company)
-                company_name = company_doc.name
-                company_abbr = company_doc.abbr
-                
-            csr_data_str = company_doc.get("custom_csr_data", "")
+                credential_company_doc = frappe.get_doc("Company", company_doc.parent_company)
+            else:
+                credential_company_doc = company_doc
+
+            csr_data_str = credential_company_doc.get("custom_csr_data", "")
 
             # frappe.msgprint(f"Using OTP (Company): {csr_values}")
         else:
