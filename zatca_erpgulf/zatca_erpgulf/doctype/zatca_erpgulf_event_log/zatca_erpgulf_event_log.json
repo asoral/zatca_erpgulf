@@ -9,6 +9,8 @@
   "title",
   "invoice_number",
   "time",
+  "status",
+  "custom_uuid",
   "api_response"
  ],
  "fields": [
@@ -39,11 +41,23 @@
    "fieldtype": "Data",
    "label": "Time",
    "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "label": "Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "custom_uuid",
+   "fieldtype": "Data",
+   "label": "UUID",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-06 09:38:24.939156",
+ "modified": "2026-09-22 09:00:00",
  "modified_by": "Administrator",
  "module": "Zatca Erpgulf",
  "name": "ZATCA ERPGulf Event Log",
