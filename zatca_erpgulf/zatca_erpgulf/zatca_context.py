@@ -591,7 +591,27 @@ def validate_zatca_invoice_before_submission(sales_invoice_doc):
             ).format(cred_company, pair_error)
         )
 
-    # 5. Certificate Expiration & Validity Window
+    # 5. Certificate identity must match the resolved seller VAT.
+    # If the VAT cannot be extracted from the certificate, do not silently
+    # treat it as a match; block submission because ZATCA may reject it.
+    certificate_vat = extract_certificate_vat(cert_pem)
+    if not certificate_vat:
+        frappe.throw(
+            _(
+                "ZATCA Error: Could not extract the VAT registration number from "
+                "the signing certificate for Company '{0}'. Submission blocked."
+            ).format(cred_company)
+        )
+    if certificate_vat != seller_vat:
+        frappe.throw(
+            _(
+                "ZATCA Error: Signing certificate VAT '{0}' does not match "
+                "seller VAT '{1}' for Company '{2}'. Submission blocked to "
+                "prevent 'invalid-signing-certificate'."
+            ).format(certificate_vat, seller_vat, company_name)
+        )
+
+    # 6. Certificate Expiration & Validity Window
     try:
         cert = x509.load_pem_x509_certificate(cert_pem.encode("utf-8"), default_backend())
         now = datetime.datetime.now(datetime.timezone.utc)
