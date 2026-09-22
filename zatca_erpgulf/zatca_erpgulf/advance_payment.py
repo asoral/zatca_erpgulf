@@ -883,6 +883,12 @@ def additional_reference_advanve(invoice, company_abbr, sales_invoice_doc):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
+        credential_context = get_zatca_credential_context(
+            get_zatca_company_context(company_doc)
+        )
+        credential_company_doc = credential_context.get("credential_company_doc")
+        if not credential_company_doc:
+            frappe.throw("Credential Company could not be resolved.")
 
         # Create the first AdditionalDocumentReference element for PIH
         cac_additionaldocumentreference2 = ET.SubElement(
@@ -897,7 +903,7 @@ def additional_reference_advanve(invoice, company_abbr, sales_invoice_doc):
             cac_attachment, "cbc:EmbeddedDocumentBinaryObject"
         )
         cbc_embeddeddocumentbinaryobject.set("mimeCode", "text/plain")
-        pih = company_doc.custom_pih
+        pih = credential_company_doc.custom_pih
         cbc_embeddeddocumentbinaryobject.text = pih
         cac_additionaldocumentreference22 = ET.SubElement(
             invoice, "cac:AdditionalDocumentReference"
