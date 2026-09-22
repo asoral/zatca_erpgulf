@@ -220,11 +220,7 @@ def reporting_api_pos_without_xml(
         credential_context = get_zatca_credential_context(
             get_zatca_company_context(pos_invoice_doc)
         )
-        production_csid = (
-            credential_context.get("csid")
-            or credential_context.get("credential_company_doc").get("custom_basic_auth_from_production")
-            or ""
-        )
+        production_csid = credential_context.get("csid") or ""
 
         xml_base64 = xml_base64_decode(signed_xmlfile_name)
 
