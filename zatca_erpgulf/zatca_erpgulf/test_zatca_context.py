@@ -4,7 +4,10 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from zatca_erpgulf.zatca_erpgulf.zatca_context import validate_buyer_identifier
+from zatca_erpgulf.zatca_erpgulf.zatca_context import (
+    validate_buyer_identifier,
+    validate_csr_identifier,
+)
 
 
 class TestZATCAContext(FrappeTestCase):
@@ -58,3 +61,24 @@ class TestZATCAContext(FrappeTestCase):
         )
         with self.assertRaises(frappe.ValidationError):
             validate_buyer_identifier(customer, is_b2c=False)
+
+    
+    def test_csr_identifier_matches_credential_company(self):
+        company = frappe._dict({
+            "name": "Grand Hyper One person Company",
+            "tax_id": "312345678901233",
+        })
+        config = {"csr.organization.identifier": "312345678901233"}
+        self.assertEqual(
+            validate_csr_identifier(company, config),
+            "312345678901233",
+        )
+
+    def test_csr_identifier_mismatch_is_rejected(self):
+        company = frappe._dict({
+            "name": "Grand Hyper One person Company",
+            "tax_id": "312345678901233",
+        })
+        config = {"csr.organization.identifier": "312345678901234"}
+        with self.assertRaises(frappe.ValidationError):
+            validate_csr_identifier(company, config)
