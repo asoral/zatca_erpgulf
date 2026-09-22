@@ -206,7 +206,8 @@ def create_csr(zatca_doc, portal_type, company_abbr):
         base64csr = base64.b64encode(mycsr)
         encoded_string = base64csr.decode("utf-8")
 
-        company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
+        # Store CSR data on the resolved credential Company. The operational
+        # child Company must not become the credential owner.
         company_doc.custom_csr_data = encoded_string.strip()
         # Save the updated company document
         company_doc.save(ignore_permissions=True)
