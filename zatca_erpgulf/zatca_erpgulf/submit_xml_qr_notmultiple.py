@@ -252,7 +252,7 @@ def send_request_and_handle_response_for_purchase_invoice(
         verify=False
     )
     frappe.publish_realtime("hide_gif", user=frappe.session.user)
-    if response.status_code in (400, 405, 406, 409):
+    if response.status_code in (400, 405, 406):
         handle_failed_submission_for_purchase_invoice(
             invoice_number,
             response,
@@ -267,7 +267,7 @@ def send_request_and_handle_response_for_purchase_invoice(
             "Your access token may be expired or not valid."
             " Please contact your system administrator.",
         )
-    elif response.status_code not in (200, 202):
+    elif response.status_code not in (200, 202, 409):
         handle_failed_submission_for_purchase_invoice(
             invoice_number,
             response,
@@ -335,7 +335,7 @@ def send_request_and_handle_response(
             "Your access token may be expired or not valid."
             " Please contact your system administrator.",
         )
-    elif response.status_code not in (200, 202):
+    elif response.status_code not in (200, 202, 409):
         handle_failed_submission(
             invoice_number,
             response,
