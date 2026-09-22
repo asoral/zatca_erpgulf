@@ -292,9 +292,10 @@ def get_zatca_company_context(doc_or_company, throw_on_missing=True):
             )
             if multiple_setting_doc
             else (
-                credential_company_doc.get("custom_basic_auth_production")
+                credential_company_doc.get("custom_basic_auth_from_production")
+                or credential_company_doc.get("custom_basic_auth_from_csid")
+                or credential_company_doc.get("custom_basic_auth_production")
                 or credential_company_doc.get("custom_basic_auth_sandbox")
-                or certificate_pem
             )
         ),
         "environment": environment,
