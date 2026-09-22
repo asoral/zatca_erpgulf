@@ -1,0 +1,11 @@
+@font-face {
+    font-family: 'saudi_riyal';
+    src: url('/assets/zatca_erpgulf/fonts/saudi_riyal.ttf') format('truetype');
+    font-display: swap;
+    unicode-range: U+20C1;
+}
+
+body,
+.print-format {
+    font-family: 'saudi_riyal', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
