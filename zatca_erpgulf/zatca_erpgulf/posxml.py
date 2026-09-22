@@ -267,7 +267,10 @@ def invoice_typecode_simplified(invoice, pos_invoice_doc):
     """function for invoice type code simplification"""
     try:
         cbc_invoicetypecode = ET.SubElement(invoice, "cbc:InvoiceTypeCode")
-        if pos_invoice_doc.is_return == 0:
+        if getattr(pos_invoice_doc, "is_debit_note", 0) == 1:
+            cbc_invoicetypecode.set("name", "0211000")  # Simplified Debit Note
+            cbc_invoicetypecode.text = "383"
+        elif pos_invoice_doc.is_return == 0:
             cbc_invoicetypecode.set("name", "0200000")  # Simplified
             cbc_invoicetypecode.text = "388"
         elif pos_invoice_doc.is_return == 1:  # return items and simplified invoice
@@ -284,7 +287,10 @@ def invoice_typecode_standard(invoice, pos_invoice_doc):
     try:
         cbc_invoicetypecode = ET.SubElement(invoice, "cbc:InvoiceTypeCode")
         cbc_invoicetypecode.set("name", "0100000")  # Standard
-        if pos_invoice_doc.is_return == 0:
+        if getattr(pos_invoice_doc, "is_debit_note", 0) == 1:
+            cbc_invoicetypecode.set("name", "0100000")  # Standard Debit Note
+            cbc_invoicetypecode.text = "383"
+        elif pos_invoice_doc.is_return == 0:
             cbc_invoicetypecode.text = "388"
         elif pos_invoice_doc.is_return == 1:  # return items and simplified invoice
             cbc_invoicetypecode.text = "381"  # Credit note
@@ -301,7 +307,7 @@ def doc_reference(invoice, pos_invoice_doc, invoice_number):
         cbc_documentcurrencycode.text = pos_invoice_doc.currency
         cbc_taxcurrencycode = ET.SubElement(invoice, "cbc:TaxCurrencyCode")
         cbc_taxcurrencycode.text = "SAR"  # SAR is as zatca requires tax amount in SAR
-        if pos_invoice_doc.is_return == 1:
+        if pos_invoice_doc.is_return == 1 or getattr(pos_invoice_doc, "is_debit_note", 0) == 1:
             invoice = billing_reference_for_credit_and_debit_note(
                 invoice, pos_invoice_doc
             )
