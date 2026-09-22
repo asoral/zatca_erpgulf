@@ -90,10 +90,12 @@ def get_csr_data(company_abbr):
 
         company_doc = frappe.get_doc("Company", company_name)
         if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            # company_doc = frappe.get_doc("Company",company_doc.parent_company)
-            company_name = frappe.db.get_value("Company",company_doc.parent_company, 'name')
+            credential_company_name = company_doc.parent_company
+        else:
+            credential_company_name = company_doc.name
 
-        csr_config_string = company_doc.custom_csr_config
+        credential_company_doc = frappe.get_doc("Company", credential_company_name)
+        csr_config_string = credential_company_doc.custom_csr_config
 
         if not csr_config_string:
             frappe.throw("No CSR config found in company settings")
