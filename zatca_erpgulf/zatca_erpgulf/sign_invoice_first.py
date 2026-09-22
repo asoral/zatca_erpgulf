@@ -294,12 +294,16 @@ def create_csr(zatca_doc, portal_type, company_abbr):
             multiple_setting_doc.custom_csr_data = encoded_string.strip()
             multiple_setting_doc.save(ignore_permissions=True)
         elif doc.doctype == "Company":
-            company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
-            if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-                company_doc = frappe.get_doc("Company",company_doc.parent_company)
-            company_doc.custom_csr_data = encoded_string.strip()
-            # Save the updated company document
-            company_doc.save(ignore_permissions=True)
+            # CSR data belongs to the resolved credential Company, not the
+            # operational child Company.
+            context = get_zatca_company_context(company_abbr)
+            credential_context = get_zatca_credential_context(context)
+            credential_company_doc = credential_context.get("credential_company_doc")
+            if not credential_company_doc:
+                frappe.throw("Credential Company could not be resolved for CSR storage.")
+            credential_company_doc.custom_csr_data = encoded_string.strip()
+            credential_company_doc.save(ignore_permissions=True)
+
         return encoded_string
     except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
         frappe.throw(
