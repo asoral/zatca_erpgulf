@@ -89,13 +89,11 @@ def get_csr_data(company_abbr):
         if not company_name:
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
-        company_doc = frappe.get_doc("Company", company_name)
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            credential_company_name = company_doc.parent_company
-        else:
-            credential_company_name = company_doc.name
-
-        credential_company_doc = frappe.get_doc("Company", credential_company_name)
+        context = get_zatca_company_context(company_doc)
+        credential_context = get_zatca_credential_context(context)
+        credential_company_doc = credential_context.get("credential_company_doc")
+        if not credential_company_doc:
+            frappe.throw("Credential Company could not be resolved.")
         csr_config_string = credential_company_doc.custom_csr_config
 
         if not csr_config_string:
@@ -150,9 +148,11 @@ def create_private_keys(company_abbr, zatca_doc):
             company_name = frappe.db.get_value(
                 "Company", {"abbr": company_abbr}, "name"
             )
-            company_doc = frappe.get_doc("Company", company_name)
-            if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-                company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            company_context = get_zatca_company_context(company_doc)
+            credential_context = get_zatca_credential_context(company_context)
+            company_doc = credential_context.get("credential_company_doc")
+            if not company_doc:
+                frappe.throw("Credential Company could not be resolved.")
         private_key = ec.generate_private_key(ec.SECP256K1(), backend=default_backend())
         private_key_pem = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
@@ -315,9 +315,14 @@ def create_csr(zatca_doc, portal_type, company_abbr):
 def get_api_url(company_abbr, base_url):
     """There are many api susing in zatca which can be defined by a feild in settings"""
     try:
-        company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
-        if not company_doc.is_group and company_doc.custom_costcenter and company_doc.parent_company:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+        company_name = frappe.db.get_value("Company", {"abbr": company_abbr}, "name")
+        if not company_name:
+            frappe.throw(f"Company with abbreviation {company_abbr} not found.")
+        context = get_zatca_company_context(company_name)
+        credential_context = get_zatca_credential_context(context)
+        company_doc = credential_context.get("credential_company_doc")
+        if not company_doc:
+            frappe.throw("Credential Company could not be resolved.")
         if company_doc.custom_select == "Sandbox":
             url = company_doc.custom_sandbox_url + base_url
         elif company_doc.custom_select == "Simulation":
@@ -359,18 +364,11 @@ def create_csid(zatca_doc, company_abbr):
                 "Company", {"abbr": company_abbr}, "name"
             )
 
-            company_doc = frappe.get_doc("Company", company_name)
-            if (
-                not company_doc.is_group
-                and company_doc.parent_company
-                and company_doc.custom_costcenter
-            ):
-                credential_company_doc = frappe.get_doc(
-                    "Company", company_doc.parent_company
-                )
-            else:
-                credential_company_doc = company_doc
-
+            context = get_zatca_company_context(company_name)
+            credential_context = get_zatca_credential_context(context)
+            credential_company_doc = credential_context.get("credential_company_doc")
+            if not credential_company_doc:
+                frappe.throw("Credential Company could not be resolved.")
             csr_data_str = credential_company_doc.get("custom_csr_data", "")
 
             # frappe.msgprint(f"Using OTP (Company): {csr_values}")
