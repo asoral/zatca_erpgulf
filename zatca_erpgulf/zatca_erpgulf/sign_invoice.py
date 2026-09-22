@@ -1349,8 +1349,12 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
             )
         company_name = sales_invoice_doc.company
         settings = frappe.get_doc("Company", company_name)
-        if not settings.is_group and settings.parent_company and settings.custom_costcenter:
-            settings = frappe.get_doc("Company",settings.parent_company)
+        credential_context = get_zatca_credential_context(
+            get_zatca_company_context(settings)
+        )
+        settings = credential_context.get("credential_company_doc")
+        if not settings:
+            frappe.throw("Credential Company could not be resolved.")
         # if settings.custom_phase_1_or_2 == "Phase-2":
         is_gpos_installed = "gpos" in frappe.get_installed_apps()
         field_exists = frappe.get_meta("Sales Invoice").has_field("custom_unique_id")
@@ -1443,9 +1447,11 @@ def resubmit_invoices(invoice_numbers, bypass_background_check=False):
         try:
             # Fetch the Sales Invoice document
             sales_invoice_doc = frappe.get_doc("Sales Invoice", invoice_number)
-            company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
-            if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-                company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            company_context = get_zatca_company_context(sales_invoice_doc)
+            credential_context = get_zatca_credential_context(company_context)
+            company_doc = credential_context.get("credential_company_doc")
+            if not company_doc:
+                frappe.throw("Credential Company could not be resolved.")
             if (
                 sales_invoice_doc.docstatus == 1
             ):  # Check if the invoice is already submitted
@@ -1483,15 +1489,12 @@ def generate_qr(invoice_number):
 
     company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
 
-    # if not group, and parent company & costcenter exist → use parent company abbr
-    if (
-        not company_doc.is_group
-        and company_doc.parent_company
-        and company_doc.custom_costcenter
-    ):
-        company_abbr = frappe.db.get_value(
-            "Company", {"name": company_doc.parent_company}, "abbr"
-        )
+    credential_context = get_zatca_credential_context(
+        get_zatca_company_context(sales_invoice_doc)
+    )
+    credential_company_doc = credential_context.get("credential_company_doc")
+    if credential_company_doc:
+        company_abbr = credential_company_doc.abbr
         
     customer_doc = frappe.get_doc("Customer", sales_invoice_doc.customer)
    
@@ -1584,11 +1587,12 @@ def zatca_call_new(
         company_abbr = frappe.db.get_value(
             "Company", {"name": sales_invoice_doc.company}, "abbr"
         )
-        company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_abbr = frappe.db.get_value(
-                "Company", {"name": company_doc.parent_company}, "abbr"
-            )
+        credential_context = get_zatca_credential_context(
+            get_zatca_company_context(sales_invoice_doc)
+        )
+        credential_company_doc = credential_context.get("credential_company_doc")
+        if credential_company_doc:
+            company_abbr = credential_company_doc.abbr
         customer_doc = frappe.get_doc("Customer", sales_invoice_doc.customer)
         if compliance_type == "0":
             if customer_doc.custom_b2c == 1:
