@@ -805,12 +805,19 @@ def supplier_data(invoice, purchase_invoice_doc):
             invoice, "cac:AccountingCustomerParty"
         )
         cac_party_2 = ET.SubElement(cac_accountingcustomerparty, "cac:Party")
-        cac_partyidentification_1 = ET.SubElement(
-            cac_party_2, "cac:PartyIdentification"
+        # Reuse the same identifier validation for purchase invoices so an
+        # empty/invalid supplier identifier cannot create malformed BT-46.
+        buyer_id_info = validate_buyer_identifier(
+            supplier_doc,
+            is_b2c=bool(supplier_doc.get("custom_b2c")),
         )
-        cbc_id_4 = ET.SubElement(cac_partyidentification_1, CBC_ID)
-        cbc_id_4.set("schemeID", str(supplier_doc.custom_buyer_id_type))
-        cbc_id_4.text = supplier_doc.custom_buyer_id
+        if buyer_id_info:
+            cac_partyidentification_1 = ET.SubElement(
+                cac_party_2, "cac:PartyIdentification"
+            )
+            cbc_id_4 = ET.SubElement(cac_partyidentification_1, CBC_ID)
+            cbc_id_4.set("schemeID", str(buyer_id_info["scheme"]))
+            cbc_id_4.text = str(buyer_id_info["id"])
 
         address = None
         if supplier_doc.custom_b2c != 1:
