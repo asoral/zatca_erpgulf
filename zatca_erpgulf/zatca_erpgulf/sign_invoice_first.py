@@ -536,19 +536,12 @@ def tag9_signature_ecdsa(company_abbr, source_doc):
         company_doc = frappe.get_doc("Company", company_name)
         context = get_zatca_company_context(source_doc or company_doc)
         credential_context = get_zatca_credential_context(context)
-        certificate_content = credential_context.get("certificate_raw") or ""
+        certificate_content = credential_context.get("certificate") or ""
 
         if not certificate_content:
             frappe.throw(f"No certificate found for company in tag9 {company_abbr}")
 
-        formatted_certificate = "-----BEGIN CERTIFICATE-----\n"
-        formatted_certificate += "\n".join(
-            certificate_content[i : i + 64]
-            for i in range(0, len(certificate_content), 64)
-        )
-        formatted_certificate += "\n-----END CERTIFICATE-----\n"
-
-        certificate_bytes = formatted_certificate.encode("utf-8")
+        certificate_bytes = certificate_content.encode("utf-8")
         cert = x509.load_pem_x509_certificate(certificate_bytes, default_backend())
         signature = cert.signature
         signature_hex = "".join("{:02x}".format(byte) for byte in signature)
@@ -742,8 +735,8 @@ def compliance_api_call(
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+        context = get_zatca_company_context(source_doc or company_doc)
+        credential_context = get_zatca_credential_context(context)
 
         payload = json.dumps(
             {
@@ -753,17 +746,9 @@ def compliance_api_call(
             }
         )
 
-        # csid = company_doc.custom_basic_auth_from_csid
-        if (
-            hasattr(source_doc, "custom_zatca_pos_name")
-            and source_doc.custom_zatca_pos_name
-        ):
-            zatca_settings = frappe.get_doc(
-                "ZATCA Multiple Setting", source_doc.custom_zatca_pos_name
-            )
-            csid = zatca_settings.custom_basic_auth_from_csid
-        else:
-            csid = company_doc.custom_basic_auth_from_csid
+        csid = credential_context.get("csid") or ""
+        if not csid:
+            frappe.throw(f"CSID for company {company_abbr} not found")
         if not csid:
             frappe.throw((f"CSID for company {company_abbr} not found"))
 
