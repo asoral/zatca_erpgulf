@@ -25,6 +25,21 @@ def validate_sales_invoice_taxes(doc, event=None):
 
     if doc.doctype == "Sales Invoice" and getattr(doc, "custom_zatca_pmm", 0) == 1:
         return
+    is_gpos_installed = "gpos" in frappe.get_installed_apps()
+    field_exists = frappe.get_meta(doc.doctype).has_field("custom_unique_id")
+    if is_gpos_installed and field_exists:
+        if getattr(doc, "custom_unique_id", None) and not getattr(doc, "custom_zatca_pos_name", None):
+            frappe.throw(_(
+                "ZATCA POS Machine name is missing for invoice, Add ZATCA POS machine name"
+            ))
+
+    if getattr(doc, "custom_zatca_pos_name", None):
+        zatca_settings = frappe.get_doc("ZATCA Multiple Setting", doc.custom_zatca_pos_name)
+        linked_company_doc = frappe.get_doc("Company", zatca_settings.custom_linked_doctype)
+        if linked_company_doc.name != doc.company:
+            frappe.throw(_(
+                "Company mismatch: Document company '{0}' does not match linked ZATCA company '{1}' of machine setting."
+            ).format(doc.company, linked_company_doc.name))
 
     customer_doc = frappe.get_doc("Customer", doc.customer)
     if (
@@ -124,3 +139,13 @@ def validate_sales_invoice_taxes(doc, event=None):
             frappe.throw(
                 _("Debit Note must reference an original invoice in 'Return Against' or 'Custom Return Against For ZATCA'.")
             )
+
+    if doc.doctype == "Sales Invoice" and "claudion4saudi" in frappe.get_installed_apps():
+        if hasattr(doc, "custom_advances_copy") and doc.custom_advances_copy:
+            for advance_row in doc.custom_advances_copy:
+                if getattr(advance_row, "difference_posting_date", None) and not getattr(advance_row, "reference_name", None):
+                    frappe.throw(_(
+                        "Missing Advance Sales Invoice reference name in advance details. "
+                        "If there is no advance sales invoice, remove the row."
+                    ))
+
