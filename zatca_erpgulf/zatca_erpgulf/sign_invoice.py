@@ -730,6 +730,10 @@ def zatca_call(
             frappe.throw("Invoice Number is NOT Valid: " + str(invoice_number))
         invoice = xml_tags()
         invoice, uuid1, sales_invoice_doc = salesinvoice_data(invoice, invoice_number)
+        # Background jobs may receive source_doc as a serialized dict/string.
+        # Always use the freshly loaded Sales Invoice document for ZATCA context,
+        # signing, certificate and credential resolution.
+        source_doc = sales_invoice_doc
 
         context = get_zatca_company_context(sales_invoice_doc)
         company_abbr = context["credential_abbr"]
