@@ -614,7 +614,7 @@ def validate_zatca_invoice_before_submission(sales_invoice_doc):
     # 6. Certificate Expiration & Validity Window
     try:
         cert = x509.load_pem_x509_certificate(cert_pem.encode("utf-8"), default_backend())
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.now(timezone.utc)
         if now < cert.not_valid_before_utc:
             frappe.throw(
                 _(
