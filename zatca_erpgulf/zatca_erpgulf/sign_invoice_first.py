@@ -472,12 +472,12 @@ def create_public_key(company_abbr, source_doc):
             )
 
         cert_base64 = (
-            "-----BEGIN CERTIFICATE-----\\n"
-            + "\\n".join(
+            "-----BEGIN CERTIFICATE-----\n"
+            + "\n".join(
                 certificate_data_str.strip()[i : i + 64]
                 for i in range(0, len(certificate_data_str.strip()), 64)
             )
-            + "\\n-----END CERTIFICATE-----\\n"
+            + "\n-----END CERTIFICATE-----\n"
         )
         cert = x509.load_pem_x509_certificate(
             cert_base64.encode(), default_backend()
