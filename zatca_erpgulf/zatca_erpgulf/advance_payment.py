@@ -43,6 +43,10 @@ from zatca_erpgulf.zatca_erpgulf.createxml import (
 from zatca_erpgulf.zatca_erpgulf.xml_tax_data import (
     get_exemption_reason_map,
 )
+from zatca_erpgulf.zatca_erpgulf.zatca_context import (
+    get_zatca_company_context,
+    get_zatca_credential_context,
+)
 
 
 from zatca_erpgulf.zatca_erpgulf.createxml_advance import (

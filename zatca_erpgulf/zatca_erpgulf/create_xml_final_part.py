@@ -954,3 +954,14 @@ def xml_structuring(invoice):
             "Encoding error occurred while processing the XML file. "
             "Please contact your system administrator."
         )
+
+
+def item_data_advance_invoice(invoice, sales_invoice_doc):
+    """Advance invoice item line handling fallback."""
+    return item_data(invoice, sales_invoice_doc)
+
+
+def item_data_with_template_advance_invoice(invoice, sales_invoice_doc):
+    """Advance invoice item line handling with template fallback."""
+    return item_data_with_template(invoice, sales_invoice_doc)
+

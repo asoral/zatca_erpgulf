@@ -5,13 +5,14 @@ import frappe
 def log_zatca_event(invoice_number, response_text, status, uuid=None, title=None):
     """Log ZATCA event and API response."""
     try:
+        uuid_str = uuid or ""
         event_doc = frappe.get_doc({
             "doctype": "ZATCA ERPGulf Event Log",
-            "title": title or f"ZATCA API Call for {invoice_number} [{status}] {uuid or \"\"}",
+            "title": title or f"ZATCA API Call for {invoice_number} [{status}] {uuid_str}".strip(),
             "invoice_number": invoice_number,
             "time": now_datetime(),
             "api_response": response_text,
-            "custom_uuid": uuid or "",
+            "custom_uuid": uuid_str,
             "status": status,
         })
         event_doc.insert(ignore_permissions=True)

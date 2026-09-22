@@ -406,6 +406,11 @@ def reporting_api(
                     # company_doc.custom_pih = encoded_hash
                     # company_doc.save(ignore_permissions=True)
                     if sales_invoice_doc.custom_zatca_pos_name:
+                        zatca_settings = credential_context.get("multiple_setting") or (
+                            frappe.get_doc("ZATCA Multiple Setting", sales_invoice_doc.custom_zatca_pos_name)
+                            if frappe.db.exists("ZATCA Multiple Setting", sales_invoice_doc.custom_zatca_pos_name)
+                            else frappe.get_doc("Zatca Multiple Setting", sales_invoice_doc.custom_zatca_pos_name)
+                        )
                         if (
                             zatca_settings.custom_send_pos_invoices_to_zatca_on_background
                         ):
@@ -611,10 +616,15 @@ def clearance_api(
             # company_doc.save(ignore_permissions=True)
             # company_name = pos_invoice_doc.company
             if sales_invoice_doc.custom_zatca_pos_name:
+                zatca_settings = credential_context.get("multiple_setting") or (
+                    frappe.get_doc("ZATCA Multiple Setting", sales_invoice_doc.custom_zatca_pos_name)
+                    if frappe.db.exists("ZATCA Multiple Setting", sales_invoice_doc.custom_zatca_pos_name)
+                    else frappe.get_doc("Zatca Multiple Setting", sales_invoice_doc.custom_zatca_pos_name)
+                )
                 if zatca_settings.custom_send_pos_invoices_to_zatca_on_background:
                     frappe.msgprint(msg)
 
-                    # Update PIH data without JSON formatting
+                # Update PIH data without JSON formatting
                 zatca_settings.custom_pih = encoded_hash
                 zatca_settings.save(ignore_permissions=True)
 

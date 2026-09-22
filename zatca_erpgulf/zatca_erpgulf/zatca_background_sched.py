@@ -632,6 +632,11 @@ def reporting_api_sales_withoutxml(
                     )
 
                     if sales_invoice_doc.custom_zatca_pos_name:
+                        zatca_settings = credential_context.get("multiple_setting") or (
+                            frappe.get_doc("ZATCA Multiple Setting", sales_invoice_doc.custom_zatca_pos_name)
+                            if frappe.db.exists("ZATCA Multiple Setting", sales_invoice_doc.custom_zatca_pos_name)
+                            else frappe.get_doc("Zatca Multiple Setting", sales_invoice_doc.custom_zatca_pos_name)
+                        )
                         if (
                             zatca_settings.custom_send_pos_invoices_to_zatca_on_background
                         ):
@@ -855,6 +860,11 @@ def reporting_api_purchase_withoutxml(
                     )
 
                     if purchase_invoice_doc.custom_zatca_pos_name:
+                        zatca_settings = credential_context.get("multiple_setting") or (
+                            frappe.get_doc("ZATCA Multiple Setting", purchase_invoice_doc.custom_zatca_pos_name)
+                            if frappe.db.exists("ZATCA Multiple Setting", purchase_invoice_doc.custom_zatca_pos_name)
+                            else frappe.get_doc("Zatca Multiple Setting", purchase_invoice_doc.custom_zatca_pos_name)
+                        )
                         if (
                             zatca_settings.custom_send_pos_invoices_to_zatca_on_background
                         ):

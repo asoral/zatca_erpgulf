@@ -376,6 +376,11 @@ def reporting_api_pos_without_xml(
                         f"Zatca Response: {response.text}<br><br>"
                     )
                     if pos_invoice_doc.custom_zatca_pos_name:
+                        zatca_settings = credential_context.get("multiple_setting") or (
+                            frappe.get_doc("ZATCA Multiple Setting", pos_invoice_doc.custom_zatca_pos_name)
+                            if frappe.db.exists("ZATCA Multiple Setting", pos_invoice_doc.custom_zatca_pos_name)
+                            else frappe.get_doc("Zatca Multiple Setting", pos_invoice_doc.custom_zatca_pos_name)
+                        )
                         if (
                             zatca_settings.custom_send_pos_invoices_to_zatca_on_background
                         ):
