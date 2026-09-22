@@ -626,6 +626,9 @@ def validate_zatca_invoice_before_submission(sales_invoice_doc):
     # 7. Customer Buyer ID validation
     customer_name = sales_invoice_doc.get("customer")
     is_b2c = bool(sales_invoice_doc.get("custom_b2c"))
+    if customer_name and not is_b2c:
+        customer_doc = frappe.get_doc("Customer", customer_name)
+        is_b2c = bool(customer_doc.get("custom_b2c"))
     if customer_name:
         validate_buyer_identifier(customer_name, is_b2c=is_b2c)
 
