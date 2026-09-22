@@ -546,6 +546,7 @@ def validate_zatca_invoice_before_submission(sales_invoice_doc):
     - ZATCA rejection errors.
     """
     context = get_zatca_company_context(sales_invoice_doc)
+    credential_context = get_zatca_credential_context(context)
     company_name = context["invoice_company"]
     cred_company = context["credential_company"]
 
@@ -566,7 +567,7 @@ def validate_zatca_invoice_before_submission(sales_invoice_doc):
         )
 
     # 2. Certificate Presence
-    cert_pem = context["certificate"]
+    cert_pem = credential_context["certificate"]
     if not cert_pem:
         frappe.throw(
             _(
@@ -575,7 +576,7 @@ def validate_zatca_invoice_before_submission(sales_invoice_doc):
         )
 
     # 3. Private Key Presence
-    key_pem = context["private_key"]
+    key_pem = credential_context["private_key"]
     if not key_pem:
         frappe.throw(
             _(
