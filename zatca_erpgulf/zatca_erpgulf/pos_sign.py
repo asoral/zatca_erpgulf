@@ -9,6 +9,7 @@ import base64
 import json
 import requests
 import frappe
+from zatca_erpgulf.zatca_erpgulf.event_log import log_zatca_event
 from zatca_erpgulf.zatca_erpgulf.zatca_context import (
     get_zatca_company_context,
     validate_zatca_invoice_before_submission,
@@ -168,6 +169,25 @@ def reporting_api(
                     verify=False
                 )
                 frappe.publish_realtime("hide_gif", user=frappe.session.user)
+                if response.status_code == 200:
+                    status_label = "Success"
+                    title = f"ZATCA Success - {invoice_number}"
+                elif response.status_code == 202:
+                    status_label = "Warning"
+                    title = f"ZATCA Invoice with Warnings - {invoice_number}"
+                elif response.status_code == 409:
+                    status_label = "Success (Duplicate Invoice)"
+                    title = f"ZATCA Duplicate Success - {invoice_number}"
+                else:
+                    status_label = f"Failed (HTTP {response.status_code})"
+                    title = f"ZATCA API Failed - {invoice_number}"
+                log_zatca_event(
+                    invoice_number=invoice_number,
+                    response_text=response.text,
+                    status=status_label,
+                    uuid=uuid1,
+                    title=title,
+                )
                 if response.status_code in (400, 405, 406, 409):
                     invoice_doc = frappe.get_doc("POS Invoice", invoice_number)
                     invoice_doc.db_set(
@@ -383,6 +403,25 @@ def clearance_api(
             verify=False
         )
         frappe.publish_realtime("hide_gif", user=frappe.session.user)
+                if response.status_code == 200:
+                    status_label = "Success"
+                    title = f"ZATCA Success - {invoice_number}"
+                elif response.status_code == 202:
+                    status_label = "Warning"
+                    title = f"ZATCA Invoice with Warnings - {invoice_number}"
+                elif response.status_code == 409:
+                    status_label = "Success (Duplicate Invoice)"
+                    title = f"ZATCA Duplicate Success - {invoice_number}"
+                else:
+                    status_label = f"Failed (HTTP {response.status_code})"
+                    title = f"ZATCA API Failed - {invoice_number}"
+                log_zatca_event(
+                    invoice_number=invoice_number,
+                    response_text=response.text,
+                    status=status_label,
+                    uuid=uuid1,
+                    title=title,
+                )
         if response.status_code in (400, 405, 406, 409):
             invoice_doc = frappe.get_doc("POS Invoice", invoice_number)
             invoice_doc.db_set(
