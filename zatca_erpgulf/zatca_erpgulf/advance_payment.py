@@ -1673,7 +1673,7 @@ def clearance_api(
         )
         frappe.publish_realtime("hide_gif", user=frappe.session.user)
 
-        if response.status_code in (400, 405, 406, 409):
+        if response.status_code in (400, 405, 406):
             invoice_doc = frappe.get_doc("Advance Sales Invoice", invoice_number)
             invoice_doc.db_set(
                 "custom_uuid", "Not Submitted", commit=True, update_modified=True
@@ -1711,7 +1711,7 @@ def clearance_api(
                     f"{response.text}"
                 )
             )
-        if response.status_code not in (200, 202):
+        if response.status_code not in (200, 202, 409):
             invoice_doc = frappe.get_doc("Advance Sales Invoice", invoice_number)
             invoice_doc.db_set(
                 "custom_uuid", "Not Submitted", commit=True, update_modified=True
@@ -1727,11 +1727,13 @@ def clearance_api(
                 f"Error: Zatca server busy or not responding. Status code: {response.status_code}"
             )
 
-        if response.status_code in (200, 202):
+        if response.status_code in (200, 202, 409):
             msg = (
                 "CLEARED WITH WARNINGS: <br><br>"
+                if response.status_code == 409
+                else ("CLEARED WITH WARNINGS: <br><br>"
                 if response.status_code == 202
-                else "SUCCESS: <br><br>"
+                else "SUCCESS: <br><br>")
             )
             msg += (
                 f"Status Code: {response.status_code}<br><br>"
