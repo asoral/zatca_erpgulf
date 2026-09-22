@@ -781,11 +781,12 @@ def zatca_call_compliance(
         if not company_name:
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
-        company_doc = frappe.get_doc("Company", company_name)
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_abbr = frappe.db.get_value(
-                "Company", {"name": company_doc.parent_company}, "abbr"
-            )
+        company_context = get_zatca_company_context(company_doc)
+        credential_context = get_zatca_credential_context(company_context)
+        company_doc = credential_context.get("credential_company_doc")
+        if not company_doc:
+            frappe.throw("Credential Company could not be resolved.")
+        company_abbr = company_doc.abbr
 
         # Determine compliance type based on company settings
         if company_doc.custom_validation_type == "Simplified Invoice":
@@ -1127,11 +1128,14 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
             frappe.throw(
                 f"Company abbreviation for {pos_invoice_doc.company} not found."
             )
-        # if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-        company_doc = frappe.get_doc("Company",{'abbr':company_abbr})
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
-            company_abbr = company_doc.abbr
+        company_doc = frappe.get_doc("Company", {'abbr': company_abbr})
+        credential_context = get_zatca_credential_context(
+            get_zatca_company_context(company_doc)
+        )
+        company_doc = credential_context.get("credential_company_doc")
+        if not company_doc:
+            frappe.throw("Credential Company could not be resolved.")
+        company_abbr = company_doc.abbr
 
 
         any_item_has_tax_template = False
@@ -1336,9 +1340,11 @@ def resubmit_invoices_pos(invoice_numbers, bypass_background_check=False):
         try:
             # Fetch the Sales Invoice document
             pos_invoice_doc = frappe.get_doc("POS Invoice", invoice_number)
-            company_doc = frappe.get_doc("Company", pos_invoice_doc.company)
-            if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-                company_doc = frappe.get_doc("Company",company_doc.parent_company)
+            company_context = get_zatca_company_context(pos_invoice_doc)
+            credential_context = get_zatca_credential_context(company_context)
+            company_doc = credential_context.get("credential_company_doc")
+            if not company_doc:
+                frappe.throw("Credential Company could not be resolved.")
 
             if (
                 pos_invoice_doc.docstatus == 1
