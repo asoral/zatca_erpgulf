@@ -366,8 +366,13 @@ def reporting_api(
                             frappe.msgprint(msg)
 
                         # Update PIH data without JSON formatting
-                        company_doc.custom_pih = encoded_hash
-                        company_doc.save(ignore_permissions=True)
+                        credential_context = get_zatca_credential_context(
+                            get_zatca_company_context(pos_invoice_doc)
+                        )
+                        credential_company_doc = credential_context.get("credential_company_doc")
+                        if credential_company_doc:
+                            credential_company_doc.custom_pih = encoded_hash
+                            credential_company_doc.save(ignore_permissions=True)
 
                     invoice_doc = frappe.get_doc("POS Invoice", invoice_number)
                     invoice_doc.db_set(
