@@ -57,8 +57,7 @@ def get_csr_data_multiple(zatca_doc):
             frappe.throw("No CSR config found in company settings")
 
         csr_config = parse_csr_config(csr_config_string)
-        validate_csr_identifier(credential_company_doc, csr_config)
-
+        # ZATCA Multiple Setting is already the credential store; there is no Company document to validate here.\n
         csr_values = {
             "csr.common.name": csr_config.get("csr.common.name"),
             "csr.serial.number": csr_config.get("csr.serial.number"),
