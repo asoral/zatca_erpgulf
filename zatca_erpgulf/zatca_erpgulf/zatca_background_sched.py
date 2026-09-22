@@ -126,11 +126,12 @@ def zatca_call_scheduler_background(
         company_abbr = frappe.db.get_value(
             "Company", {"name": sales_invoice_doc.company}, "abbr"
         )
-        company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_abbr = frappe.db.get_value(
-                "Company", {"name": company_doc.parent_company}, "abbr"
-            )
+        credential_context = get_zatca_credential_context(
+            get_zatca_company_context(sales_invoice_doc)
+        )
+        credential_company_doc = credential_context.get("credential_company_doc")
+        if credential_company_doc:
+            company_abbr = credential_company_doc.abbr
 
         customer_doc = frappe.get_doc("Customer", sales_invoice_doc.customer)
 
@@ -267,11 +268,12 @@ def zatca_call_purchase_invoice_scheduler_background(
         company_abbr = frappe.db.get_value(
             "Company", {"name": purchase_invoice_doc.company}, "abbr"
         )
-        company_doc = frappe.get_doc("Company", purchase_invoice_doc.company)
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_abbr = frappe.db.get_value(
-                "Company", {"name": company_doc.parent_company}, "abbr"
-            )
+        credential_context = get_zatca_credential_context(
+            get_zatca_company_context(purchase_invoice_doc)
+        )
+        credential_company_doc = credential_context.get("credential_company_doc")
+        if credential_company_doc:
+            company_abbr = credential_company_doc.abbr
 
         supplier_doc = frappe.get_doc("Supplier", purchase_invoice_doc.supplier)
 
