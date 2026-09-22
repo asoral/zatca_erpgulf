@@ -355,8 +355,14 @@ def create_csid(zatca_doc, company_abbr):
             )
 
             company_doc = frappe.get_doc("Company", company_name)
-            if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-                credential_company_doc = frappe.get_doc("Company", company_doc.parent_company)
+            if (
+                not company_doc.is_group
+                and company_doc.parent_company
+                and company_doc.custom_costcenter
+            ):
+                credential_company_doc = frappe.get_doc(
+                    "Company", company_doc.parent_company
+                )
             else:
                 credential_company_doc = company_doc
 
@@ -377,7 +383,10 @@ def create_csid(zatca_doc, company_abbr):
             otp = multiple_setting_doc.get("custom_otp", "")
             # frappe.msgprint(f"Using OTP (Multiple Setting): {csr_values}")
         elif doc.doctype == "Company":
-            otp = company_doc.get("custom_otp", "")
+            # OTP belongs to the credential Company. A child branch is only
+            # the operational/source Company and must not be used as the
+            # credential store.
+            otp = credential_company_doc.get("custom_otp", "")
 
             # frappe.msgprint(f"Using OTP (Company): {csr_values}")
         else:
@@ -424,12 +433,16 @@ def create_csid(zatca_doc, company_abbr):
             multiple_setting_doc.custom_compliance_request_id_ = data["requestID"]
             multiple_setting_doc.save(ignore_permissions=True)
         elif doc.doctype == "Company":
-            company_doc.custom_certificate = base64.b64decode(
+            # Persist the compliance certificate, CSID and request ID on the
+            # credential Company. The operational child Company must remain
+            # untouched so the centralized credential resolver can use the
+            # parent consistently for signing and submission.
+            credential_company_doc.custom_certificate = base64.b64decode(
                 data["binarySecurityToken"]
             ).decode("utf-8")
-            company_doc.custom_basic_auth_from_csid = encoded_value
-            company_doc.custom_compliance_request_id_ = data["requestID"]
-            company_doc.save(ignore_permissions=True)
+            credential_company_doc.custom_basic_auth_from_csid = encoded_value
+            credential_company_doc.custom_compliance_request_id_ = data["requestID"]
+            credential_company_doc.save(ignore_permissions=True)
         return response.text
 
     except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
@@ -817,8 +830,19 @@ def production_csid(zatca_doc, company_abbr):
             )
 
             company_doc = frappe.get_doc("Company", company_name)
-            csid = company_doc.custom_basic_auth_from_csid
-            request_id = company_doc.custom_compliance_request_id_
+            if (
+                not company_doc.is_group
+                and company_doc.parent_company
+                and company_doc.custom_costcenter
+            ):
+                credential_company_doc = frappe.get_doc(
+                    "Company", company_doc.parent_company
+                )
+            else:
+                credential_company_doc = company_doc
+
+            csid = credential_company_doc.custom_basic_auth_from_csid
+            request_id = credential_company_doc.custom_compliance_request_id_
 
         if not csid:
             frappe.throw(("CSID for company not found"))
@@ -863,12 +887,14 @@ def production_csid(zatca_doc, company_abbr):
 
             multiple_setting_doc.save(ignore_permissions=True)
         elif doc.doctype == "Company":
-            company_doc.custom_certificate = base64.b64decode(
+            # Production credentials belong to the credential Company, not
+            # the operational child branch.
+            credential_company_doc.custom_certificate = base64.b64decode(
                 data["binarySecurityToken"]
             ).decode("utf-8")
-            company_doc.custom_basic_auth_from_production = encoded_value
+            credential_company_doc.custom_basic_auth_from_production = encoded_value
 
-            company_doc.save(ignore_permissions=True)
+            credential_company_doc.save(ignore_permissions=True)
 
         return response.text
 
