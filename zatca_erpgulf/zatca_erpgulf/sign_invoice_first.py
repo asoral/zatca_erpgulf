@@ -586,7 +586,8 @@ def digital_signature(hash1, company_abbr, source_doc):
     """find digital signature of xml"""
     try:
         context = get_zatca_company_context(source_doc or company_abbr)
-        private_key_data_str = context["private_key"]
+        credential_context = get_zatca_credential_context(context)
+        private_key_data_str = credential_context["private_key"]
 
         if not private_key_data_str:
             frappe.throw(f"No private key data found for company {context['operational_company']}.")
@@ -609,7 +610,8 @@ def extract_certificate_details(company_abbr, source_doc):
     """extracting the certificate details from the certificate data"""
     try:
         context = get_zatca_company_context(source_doc or company_abbr)
-        formatted_certificate = context["certificate"]
+        credential_context = get_zatca_credential_context(context)
+        formatted_certificate = credential_context["certificate"]
 
         if not formatted_certificate:
             frappe.throw(f"No valid certificate content found for company {context['operational_company']}")
@@ -630,7 +632,8 @@ def certificate_hash(company_abbr, source_doc):
     """Find the certificate hash and returning the value"""
     try:
         context = get_zatca_company_context(source_doc or company_abbr)
-        certificate_data = (context.get("certificate_raw") or "").strip()
+        credential_context = get_zatca_credential_context(context)
+        certificate_data = (credential_context.get("certificate_raw") or "").strip()
 
         if not certificate_data:
             frappe.throw(f"No certificate data found for company {context['operational_company']}")
@@ -908,20 +911,9 @@ def tag9_signature_ecdsa(company_abbr, source_doc):
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
-
-        if source_doc:
-            if source_doc.doctype in SUPPORTED_INVOICES:
-                # Use certificate from the company document for Sales Invoice
-                if source_doc.custom_zatca_pos_name:
-                    # Fetch Zatca settings and use its certificate
-                    zatca_settings = frappe.get_doc(
-                        "ZATCA Multiple Setting", source_doc.custom_zatca_pos_name
-                    )
-                    certificate_content = zatca_settings.custom_certficate or ""
-                else:
-                    certificate_content = company_doc.custom_certificate or ""
-            elif source_doc.doctype == "Company":
-                certificate_content = company_doc.custom_certificate or ""
+        context = get_zatca_company_context(source_doc or company_doc)
+        credential_context = get_zatca_credential_context(context)
+        certificate_content = credential_context.get("certificate_raw") or ""
 
         if not certificate_content:
             frappe.throw(f"No certificate found for company in tag9 {company_abbr}")
