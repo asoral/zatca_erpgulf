@@ -1744,9 +1744,12 @@ def clearance_api(
             if settings.custom_send_einvoice_background:
                 frappe.msgprint(msg)
 
-                # Update PIH data without JSON formatting
-            company_doc.custom_pih = encoded_hash
-            company_doc.save(ignore_permissions=True)
+                # PIH belongs to the credential Company in the multicompany
+            # architecture, not the operational child Company.
+            credential_company_doc = credential_context.get("credential_company_doc")
+            if credential_company_doc:
+                credential_company_doc.custom_pih = encoded_hash
+                credential_company_doc.save(ignore_permissions=True)
 
             invoice_doc = frappe.get_doc("Advance Sales Invoice", invoice_number)
             invoice_doc.db_set(
