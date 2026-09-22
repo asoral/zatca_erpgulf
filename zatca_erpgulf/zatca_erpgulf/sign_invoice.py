@@ -218,6 +218,7 @@ def reporting_api(
                 f"Company with abbreviation {sales_invoice_doc.company} not found."
             )
         
+        company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
         company_context = get_zatca_company_context(company_doc)
         credential_context = get_zatca_credential_context(company_context)
         company_doc = credential_context.get("credential_company_doc")
