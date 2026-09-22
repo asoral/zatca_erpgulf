@@ -20,7 +20,10 @@ from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 import requests
 import asn1
-from zatca_erpgulf.zatca_erpgulf.zatca_context import get_zatca_company_context
+from zatca_erpgulf.zatca_erpgulf.zatca_context import (
+    get_zatca_company_context,
+    get_zatca_credential_context,
+)
 
 SUPPORTED_INVOICES = ["Sales Invoice", "POS Invoice", "Purchase Invoice"]
 
@@ -749,8 +752,6 @@ def compliance_api_call(
         csid = credential_context.get("csid") or ""
         if not csid:
             frappe.throw(f"CSID for company {company_abbr} not found")
-        if not csid:
-            frappe.throw((f"CSID for company {company_abbr} not found"))
 
         headers = {
             "accept": "application/json",
