@@ -183,7 +183,7 @@ def reporting_api(
                     uuid=uuid1,
                     title=title,
                 )
-                if response.status_code in (400, 405, 406, 409):
+                if response.status_code in (400, 405, 406):
                     invoice_doc = frappe.get_doc("POS Invoice", invoice_number)
                     invoice_doc.db_set(
                         "custom_uuid",
@@ -212,7 +212,69 @@ def reporting_api(
                         )
                     )
 
-                if response.status_code in (401, 403, 407, 451):
+                if response.status_code == 409:
+        msg = (
+            "DUPLICATE INVOICE ACCEPTED: <br><br>"
+            f"Status Code: {response.status_code}<br><br>"
+            f"Zatca Response: {response.text}<br><br>"
+        )
+        log_zatca_event(
+            invoice_number=invoice_number,
+            response_text=response.text,
+            status="Success (Duplicate Invoice)",
+            uuid=uuid1,
+            title=f"ZATCA Duplicate Success - {invoice_number}",
+        )
+        invoice_doc = frappe.get_doc("POS Invoice", invoice_number)
+        invoice_doc.db_set(
+            "custom_zatca_full_response", msg,
+            commit=True,
+            update_modified=True,
+        )
+        invoice_doc.db_set(
+            "custom_uuid", uuid1,
+            commit=True,
+            update_modified=True,
+        )
+        invoice_doc.db_set(
+            "custom_zatca_status", "REPORTED",
+            commit=True,
+            update_modified=True,
+        )
+        success_log(response.text, uuid1, invoice_number)
+
+    if response.status_code == 409:
+        msg = (
+            "DUPLICATE INVOICE ACCEPTED: <br><br>"
+            f"Status Code: {response.status_code}<br><br>"
+            f"Zatca Response: {response.text}<br><br>"
+        )
+        log_zatca_event(
+            invoice_number=invoice_number,
+            response_text=response.text,
+            status="Success (Duplicate Invoice)",
+            uuid=uuid1,
+            title=f"ZATCA Duplicate Success - {invoice_number}",
+        )
+        invoice_doc = frappe.get_doc("POS Invoice", invoice_number)
+        invoice_doc.db_set(
+            "custom_zatca_full_response", msg,
+            commit=True,
+            update_modified=True,
+        )
+        invoice_doc.db_set(
+            "custom_uuid", uuid1,
+            commit=True,
+            update_modified=True,
+        )
+        invoice_doc.db_set(
+            "custom_zatca_status", "REPORTED",
+            commit=True,
+            update_modified=True,
+        )
+        success_log(response.text, uuid1, invoice_number)
+
+    if response.status_code in (401, 403, 407, 451):
                     invoice_doc = frappe.get_doc("POS Invoice", invoice_number)
                     invoice_doc.db_set(
                         "custom_uuid",
@@ -414,7 +476,7 @@ def clearance_api(
                     uuid=uuid1,
                     title=title,
                 )
-        if response.status_code in (400, 405, 406, 409):
+        if response.status_code in (400, 405, 406):
             invoice_doc = frappe.get_doc("POS Invoice", invoice_number)
             invoice_doc.db_set(
                 "custom_uuid", "Not Submitted", commit=True, update_modified=True
