@@ -418,9 +418,11 @@ def clearance_api(
                 )
             )
 
-        company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+        company_context = get_zatca_company_context(company_doc)
+        credential_context = get_zatca_credential_context(company_context)
+        company_doc = credential_context.get("credential_company_doc")
+        if not company_doc:
+            frappe.throw("Credential Company could not be resolved.")
             company_abbr = company_doc.abbr
         credential_context = get_zatca_credential_context(
             get_zatca_company_context(pos_invoice_doc)
@@ -911,8 +913,11 @@ def zatca_background_(invoice_number, source_doc, bypass_background_check=False)
         company_name = pos_invoice_doc.company
 
         settings = frappe.get_doc("Company", company_name)
-        if settings.is_group and settings.custom_costcenter and settings.parent_company:
-            settings = frappe.get_doc("Company", settings.parent_company)
+        company_context = get_zatca_company_context(settings)
+        credential_context = get_zatca_credential_context(company_context)
+        settings = credential_context.get("credential_company_doc")
+        if not settings:
+            frappe.throw("Credential Company could not be resolved.")
         company_abbr = settings.abbr
 
         any_item_has_tax_template = any(
