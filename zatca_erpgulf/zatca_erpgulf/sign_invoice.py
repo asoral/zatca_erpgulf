@@ -474,7 +474,6 @@ def clearance_api(
         context = get_zatca_company_context(sales_invoice_doc)
         credential_context = get_zatca_credential_context(context)
         production_csid = credential_context.get("csid") or ""
-        )
         payload = {
             "invoiceHash": encoded_hash,
             "uuid": uuid1,
@@ -510,27 +509,27 @@ def clearance_api(
         print("responsedfvjhfdhjfd",response)
         print("response status code--",response.status_code)
         frappe.publish_realtime("hide_gif", user=frappe.session.user)
-                if response.status_code == 200:
-                    status_label = "Success"
-                    title = f"ZATCA Success - {invoice_number}"
-                elif response.status_code == 202:
-                    status_label = "Warning"
-                    title = f"ZATCA Invoice with Warnings - {invoice_number}"
-                elif response.status_code == 409:
-                    status_label = "Success (Duplicate Invoice)"
-                    title = f"ZATCA Duplicate Success - {invoice_number}"
-                else:
-                    status_label = f"Failed (HTTP {response.status_code})"
-                    title = f"ZATCA API Failed - {invoice_number}"
-                log_zatca_event(
-                    invoice_number=invoice_number,
-                    response_text=response.text,
-                    status=status_label,
-                    uuid=uuid1,
-                    title=title,
-                )
+        if response.status_code == 200:
+            status_label = "Success"
+            title = f"ZATCA Success - {invoice_number}"
+        elif response.status_code == 202:
+            status_label = "Warning"
+            title = f"ZATCA Invoice with Warnings - {invoice_number}"
+        elif response.status_code == 409:
+            status_label = "Success (Duplicate Invoice)"
+            title = f"ZATCA Duplicate Success - {invoice_number}"
+        else:
+            status_label = f"Failed (HTTP {response.status_code})"
+            title = f"ZATCA API Failed - {invoice_number}"
+        log_zatca_event(
+            invoice_number=invoice_number,
+            response_text=response.text,
+            status=status_label,
+            uuid=uuid1,
+            title=title,
+        )
 
-        if response.status_code in (400, 405, 406, 409):
+        if response.status_code in (400, 405, 406):
             invoice_doc = frappe.get_doc("Sales Invoice", invoice_number)
             invoice_doc.db_set(
                 "custom_uuid", "Not Submitted", commit=True, update_modified=True
