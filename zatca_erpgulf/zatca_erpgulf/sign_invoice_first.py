@@ -789,10 +789,6 @@ def compliance_api_call(
 def production_csid(zatca_doc, company_abbr):
     company = frappe.get_doc("Company", {'abbr': company_abbr})
 
-
-    if not company.is_group and company.parent_company and company.custom_costcenter:
-        company_abbr = frappe.db.get_value('Company', company.parent_company, 'abbr')
-
     """production csid button and api"""
     try:
 
