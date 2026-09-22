@@ -473,18 +473,13 @@ def clearance_api(
             )
             
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
-            company_abbr = company_doc.abbr
-
-        # production_csid = company_doc.custom_basic_auth_from_production or ""
-        if sales_invoice_doc.custom_zatca_pos_name:
-            zatca_settings = frappe.get_doc(
-                "Zatca Multiple Setting", sales_invoice_doc.custom_zatca_pos_name
-            )
-            production_csid = zatca_settings.custom_final_auth_csid
-        else:
-            production_csid = company_doc.custom_basic_auth_from_production or ""
+        context = get_zatca_company_context(sales_invoice_doc)
+        credential_context = get_zatca_credential_context(context)
+        production_csid = (
+            credential_context.get("csid")
+            or credential_context.get("credential_company_doc").get("custom_basic_auth_from_production")
+            or ""
+        )
         payload = {
             "invoiceHash": encoded_hash,
             "uuid": uuid1,
