@@ -1018,7 +1018,7 @@ def zatca_background(invoice_number, source_doc, bypass_background_check=False):
         sales_invoice_doc = frappe.get_doc("Sales Invoice", invoice_number)
         company_name = sales_invoice_doc.company
         settings = frappe.get_doc("Company", company_name)
-        company_context = get_zatca_company_context(settings)
+        company_context = get_zatca_company_context(company_name)
         credential_context = get_zatca_credential_context(company_context)
         settings = credential_context.get("credential_company_doc")
         if not settings:
