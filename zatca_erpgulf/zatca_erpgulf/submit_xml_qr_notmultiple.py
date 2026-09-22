@@ -3,6 +3,7 @@
 import base64
 import frappe
 import requests
+from zatca_erpgulf.zatca_erpgulf.zatca_context import get_zatca_company_context, get_zatca_credential_context
 from lxml import etree
 
 CONTENT_TYPE_JSON = "application/json"
@@ -204,13 +205,15 @@ def reporting_api_xml_purchase_invoice_simplified(
 
 
 def get_production_csid(sales_invoice_doc, company_doc):
-    """get production csid"""
-    if sales_invoice_doc.custom_zatca_pos_name:
-        zatca_settings = frappe.get_doc(
-            "Zatca Multiple Setting", sales_invoice_doc.custom_zatca_pos_name
-        )
-        return zatca_settings.custom_final_auth_csid
-    return company_doc.custom_basic_auth_from_production
+    """Resolve CSID from the centralized operational/credential company context."""
+    context = get_zatca_company_context(sales_invoice_doc)
+    credential_context = get_zatca_credential_context(context)
+    credential_company = credential_context.get("credential_company_doc")
+    return (
+        credential_context.get("csid")
+        or (credential_company.get("custom_basic_auth_from_production") if credential_company else "")
+        or ""
+    )
 
 
 def get_headers(production_csid):
