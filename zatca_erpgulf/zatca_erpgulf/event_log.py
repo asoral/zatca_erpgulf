@@ -7,7 +7,7 @@ def log_zatca_event(invoice_number, response_text, status, uuid=None, title=None
     try:
         event_doc = frappe.get_doc({
             "doctype": "ZATCA ERPGulf Event Log",
-            "title": title or f"ZATCA API Call for {invoice_number}",
+            "title": title or f"ZATCA API Call for {invoice_number} [{status}] {uuid or \"\"}",
             "invoice_number": invoice_number,
             "time": now_datetime(),
             "api_response": response_text,
