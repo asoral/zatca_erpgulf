@@ -1635,7 +1635,10 @@ def clearance_api(
                 f" problem with company name in {sales_invoice_doc.company} not found."
             )
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
-        production_csid = company_doc.custom_basic_auth_from_production or ""
+        credential_context = get_zatca_credential_context(
+            get_zatca_company_context(sales_invoice_doc)
+        )
+        production_csid = credential_context.get("csid") or ""
         payload = {
             "invoiceHash": encoded_hash,
             "uuid": uuid1,
