@@ -835,16 +835,11 @@ def production_csid(zatca_doc, company_abbr):
             )
 
             company_doc = frappe.get_doc("Company", company_name)
-            if (
-                not company_doc.is_group
-                and company_doc.parent_company
-                and company_doc.custom_costcenter
-            ):
-                credential_company_doc = frappe.get_doc(
-                    "Company", company_doc.parent_company
-                )
-            else:
-                credential_company_doc = company_doc
+            context = get_zatca_company_context(company_doc)
+            credential_context = get_zatca_credential_context(context)
+            credential_company_doc = credential_context.get("credential_company_doc")
+            if not credential_company_doc:
+                frappe.throw("Credential Company could not be resolved.")
 
             csid = credential_company_doc.custom_basic_auth_from_csid
             request_id = credential_company_doc.custom_compliance_request_id_
