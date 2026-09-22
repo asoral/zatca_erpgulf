@@ -430,11 +430,7 @@ def reporting_api_sales_withoutxml(
         credential_context = get_zatca_credential_context(
             get_zatca_company_context(sales_invoice_doc)
         )
-        production_csid = (
-            credential_context.get("csid")
-            or credential_context.get("credential_company_doc").get("custom_basic_auth_from_production")
-            or ""
-        )
+        production_csid = credential_context.get("csid") or ""
 
         if not production_csid:
             frappe.throw(
@@ -655,11 +651,7 @@ def reporting_api_purchase_withoutxml(
         credential_context = get_zatca_credential_context(
             get_zatca_company_context(purchase_invoice_doc)
         )
-        production_csid = (
-            credential_context.get("csid")
-            or credential_context.get("credential_company_doc").get("custom_basic_auth_from_production")
-            or ""
-        )
+        production_csid = credential_context.get("csid") or ""
 
         if not production_csid:
             frappe.throw(
