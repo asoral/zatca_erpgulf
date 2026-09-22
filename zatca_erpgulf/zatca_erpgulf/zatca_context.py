@@ -104,6 +104,53 @@ def clean_pem_private_key(key_str):
     return f"-----BEGIN EC PRIVATE KEY-----\n{wrapped}\n-----END EC PRIVATE KEY-----\n"
 
 
+
+def validate_csr_identifier(credential_company_doc, csr_config):
+    """
+    Validate the CSR organization identifier against the credential Company's VAT.
+
+    For the Company onboarding flow, the CSR is the credential identity. The
+    operational child Company remains the invoice/branch identity and must not
+    silently change the CSR's VAT identifier.
+    """
+    if not credential_company_doc:
+        frappe.throw(_("Credential Company is required for CSR validation."))
+
+    configured_identifier = (
+        csr_config.get("csr.organization.identifier") or ""
+    ).strip().replace(" ", "").replace("-", "")
+    company_vat = (
+        credential_company_doc.get("tax_id") or ""
+    ).strip().replace(" ", "").replace("-", "")
+
+    if not configured_identifier:
+        frappe.throw(
+            _("ZATCA CSR Error: 'csr.organization.identifier' is missing.")
+        )
+
+    if not re.fullmatch(r"3\d{13}3", configured_identifier):
+        frappe.throw(
+            _(
+                "ZATCA CSR Error: Invalid 'csr.organization.identifier' '{0}'. "
+                "It must be exactly 15 digits starting and ending with 3."
+            ).format(configured_identifier)
+        )
+
+    if company_vat and configured_identifier != company_vat:
+        frappe.throw(
+            _(
+                "ZATCA CSR Error: CSR organization identifier '{0}' does not "
+                "match credential Company '{1}' VAT '{2}'. The CSR must be "
+                "generated for the credential Company."
+            ).format(
+                configured_identifier,
+                credential_company_doc.name,
+                company_vat,
+            )
+        )
+
+    return configured_identifier
+
 def get_zatca_company_context(doc_or_company, throw_on_missing=True):
     """
     Resolve ZATCA multi-company architecture context.
