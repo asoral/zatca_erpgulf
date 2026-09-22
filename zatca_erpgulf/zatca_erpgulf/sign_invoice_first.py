@@ -89,6 +89,7 @@ def get_csr_data(company_abbr):
         if not company_name:
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
+        company_doc = frappe.get_doc("Company", company_name)
         context = get_zatca_company_context(company_doc)
         credential_context = get_zatca_credential_context(context)
         credential_company_doc = credential_context.get("credential_company_doc")
@@ -148,6 +149,7 @@ def create_private_keys(company_abbr, zatca_doc):
             company_name = frappe.db.get_value(
                 "Company", {"abbr": company_abbr}, "name"
             )
+            company_doc = frappe.get_doc("Company", company_name)
             company_context = get_zatca_company_context(company_doc)
             credential_context = get_zatca_credential_context(company_context)
             company_doc = credential_context.get("credential_company_doc")
