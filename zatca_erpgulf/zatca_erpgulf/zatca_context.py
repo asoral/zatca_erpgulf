@@ -241,11 +241,7 @@ def get_zatca_company_context(doc_or_company, throw_on_missing=True):
         frappe.db.exists("ZATCA Multiple Setting", pos_setting_name)
         or frappe.db.exists("Zatca Multiple Setting", pos_setting_name)
     ):
-        multiple_setting_doctype = (
-            "ZATCA Multiple Setting"
-            if frappe.db.exists("ZATCA Multiple Setting", pos_setting_name)
-            else "Zatca Multiple Setting"
-        )
+        multiple_setting_doctype = "ZATCA Multiple Setting"
         multiple_setting_doc = frappe.get_doc(multiple_setting_doctype, pos_setting_name)
         if multiple_setting_doc.get("custom_certficate"):
             cert_raw = (multiple_setting_doc.get("custom_certficate") or "").strip()
