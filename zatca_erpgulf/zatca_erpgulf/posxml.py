@@ -16,6 +16,7 @@ import re
 import json
 from frappe.utils.data import get_time
 import frappe
+from frappe import _
 from zatca_erpgulf.zatca_erpgulf.zatca_context import (
     get_zatca_company_context,
     validate_buyer_identifier,
@@ -951,6 +952,15 @@ def get_exemption_reason_map():
             "case-by-case basis."
         ),
     }
+
+
+def get_tax_wise_detail(pos_invoice_doc, single_item):
+    """Return item-wise tax details compatible with Frappe v15/v16."""
+    if int(frappe.__version__.split(".", 1)[0]) == 16 and getattr(pos_invoice_doc, "item_wise_tax_details", None):
+        tax_rate = float(f"{pos_invoice_doc.item_wise_tax_details[0].rate:.1f}")
+        tax_amount = pos_invoice_doc.item_wise_tax_details[0].amount
+        return json.dumps({single_item.item_code: [tax_rate, float(tax_amount)]})
+    return pos_invoice_doc.taxes[0].item_wise_tax_detail
 
 
 def get_tax_total_from_items(pos_invoice_doc):
