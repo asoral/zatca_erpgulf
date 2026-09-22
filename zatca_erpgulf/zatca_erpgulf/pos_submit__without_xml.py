@@ -368,7 +368,7 @@ def reporting_api_pos_without_xml(
                         )
                     )
 
-                if response.status_code not in (200, 202):
+                if response.status_code not in (200, 202, 409):
                     invoice_doc = frappe.get_doc(POS_INVOICE, invoice_number)
                     invoice_doc.db_set(
                         "custom_uuid",
