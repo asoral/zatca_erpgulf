@@ -3,6 +3,7 @@
 import base64
 import frappe
 import requests
+from zatca_erpgulf.zatca_erpgulf.event_log import log_zatca_event
 from zatca_erpgulf.zatca_erpgulf.zatca_context import get_zatca_company_context, get_zatca_credential_context
 from lxml import etree
 
@@ -27,15 +28,14 @@ def xml_base64_decode(signed_xmlfile_name):
 def get_api_url(company_abbr, base_url):
     """There are many api susing in zatca which can be defined by a feild in settings"""
     try:
-        company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Compnay",company_doc.parent_company)
-        if company_doc.custom_select == "Sandbox":
-            url = company_doc.custom_sandbox_url + base_url
-        elif company_doc.custom_select == "Simulation":
-            url = company_doc.custom_simulation_url + base_url
+        context = get_zatca_company_context(company_abbr)
+        company_doc = context["credential_company_doc"]
+        if context["environment"] == "sandbox":
+            url = (company_doc.get("custom_sandbox_url") or "") + base_url
+        elif context["environment"] == "simulation":
+            url = (company_doc.get("custom_simulation_url") or "") + base_url
         else:
-            url = company_doc.custom_production_url + base_url
+            url = (company_doc.get("custom_production_url") or "") + base_url
 
         return url
 
@@ -302,14 +302,32 @@ def send_request_and_handle_response(
         verify=False
     )
     frappe.publish_realtime("hide_gif", user=frappe.session.user)
-    if response.status_code in (400, 405, 406, 409):
-        handle_failed_submission(
-            invoice_number,
-            response,
-            "Error: The request you are sending to Zatca is in incorrect format."
-            " Please report to system administrator.",
+    if response.status_code in (200, 202, 409):
+        status_label = (
+            "Success"
+            if response.status_code == 200
+            else "Warning"
+            if response.status_code == 202
+            else "Success (Duplicate Invoice)"
         )
-    elif response.status_code in (401, 403, 407, 451):
+        title = (
+            f"ZATCA Success - {invoice_number}"
+            if response.status_code == 200
+            else f"ZATCA Invoice with Warnings - {invoice_number}"
+            if response.status_code == 202
+            else f"ZATCA Duplicate Success - {invoice_number}"
+        )
+        log_zatca_event(
+            invoice_number=invoice_number,
+            response_text=response.text,
+            status=status_label,
+            uuid=uuid1,
+            title=title,
+        )
+        handle_successful_submission(
+            invoice_number, response, sales_invoice_doc, encoded_hash, uuid1
+        )
+    elif response.status_code in (400, 405, 406):
         handle_failed_submission(
             invoice_number,
             response,
@@ -332,7 +350,7 @@ def send_request_and_handle_response(
 
 def handle_failed_submission(invoice_number, response, error_message):
     """handle_failed_submission"""
-    update_invoice_status(invoice_number, NOT_SUBMITTED)
+    update_invoice_status(invoice_number, NOT_SUBMITTED, msg=response.text)
     frappe.throw(
         f"{error_message} Status code: {response.status_code}<br><br>{response.text}"
     )
@@ -350,7 +368,7 @@ def handle_successful_submission(
     """handle_successful_submission"""
     msg = (
         "SUCCESS: <br><br>"
-        if response.status_code == 200
+        if response.status_code in (200, 409)
         else "REPORTED WITH WARNINGS: <br><br> Please copy the below message"
         " and send it to your system administrator "
         "to fix this warnings before next submission <br><br>"
