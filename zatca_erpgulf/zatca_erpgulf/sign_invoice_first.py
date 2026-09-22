@@ -474,66 +474,38 @@ def create_public_key(company_abbr, source_doc):
         return None
 
 def extract_public_key_data(company_abbr, source_doc):
-    """extract public key"""
+    """Extract the public key for the resolved ZATCA credential source."""
     try:
-        company_name = frappe.db.get_value("Company", {"abbr": company_abbr}, "name")
-        if not company_name:
-            frappe.throw(f"Company with abbreviation {company_abbr} not found.")
+        context = get_zatca_company_context(source_doc or company_abbr)
+        credential_context = get_zatca_credential_context(context)
+        public_key_pem = ""
 
-        company_doc = frappe.get_doc("Company", company_name)
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+        multiple_setting_doc = credential_context.get("multiple_setting")
+        if multiple_setting_doc:
+            public_key_pem = multiple_setting_doc.get("custom_public_key") or ""
 
-
-        if source_doc:
-            if source_doc.doctype in SUPPORTED_INVOICES:
-                # Use certificate from the company document for Sales Invoice
-                if source_doc.custom_zatca_pos_name:
-                    # Fetch Zatca settings and use its certificate
-                    zatca_settings = frappe.get_doc(
-                        "ZATCA Multiple Setting", source_doc.custom_zatca_pos_name
-                    )
-                    public_key_pem = zatca_settings.get("custom_public_key", "")
-                else:
-                    public_key_pem = company_doc.get("custom_public_key", "")
-            elif source_doc.doctype == "Company":
-                public_key_pem = company_doc.get("custom_public_key", "")
         if not public_key_pem:
-            frappe.throw(f"No public key found for company {company_name}")
+            credential_company_doc = credential_context.get("credential_company_doc")
+            public_key_pem = (
+                credential_company_doc.get("custom_public_key") or ""
+                if credential_company_doc
+                else ""
+            )
 
-        lines = public_key_pem.splitlines()
-        key_data = "".join(lines[1:-1])
-        key_data = key_data.replace("-----BEGIN PUBLIC KEY-----", "").replace(
-            "-----END PUBLIC KEY-----", ""
+        if not public_key_pem:
+            public_key_pem = create_public_key(company_abbr, source_doc)
+
+        public_key_bytes = public_key_pem.encode("utf-8")
+        public_key = serialization.load_pem_public_key(
+            public_key_bytes, backend=default_backend()
         )
-        key_data = key_data.replace(" ", "").replace("\n", "")
-
-        return key_data
-
+        public_key_der = public_key.public_bytes(
+            encoding=serialization.Encoding.DER,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        return base64.b64encode(public_key_der).decode("utf-8")
     except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
-        frappe.throw("Error in extracting public key data: " + str(e))
-        return None
-
-
-def get_tlv_for_value(tag_num, tag_value):
-    """get the tlv data value for teh qr"""
-    try:
-        tag_num_buf = bytes([tag_num])
-        if tag_value is None:
-            frappe.throw(f"Error: Tag value for tag number {tag_num} is None")
-        if isinstance(tag_value, str):
-            if len(tag_value) < 256:
-                tag_value_len_buf = bytes([len(tag_value)])
-            else:
-                tag_value_len_buf = bytes(
-                    [0xFF, (len(tag_value) >> 8) & 0xFF, len(tag_value) & 0xFF]
-                )
-            tag_value = tag_value.encode("utf-8")
-        else:
-            tag_value_len_buf = bytes([len(tag_value)])
-        return tag_num_buf + tag_value_len_buf + tag_value
-    except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
-        frappe.throw(" error in getting the tlv data value: " + str(e))
+        frappe.throw(_("Error in extracting public key: {0}").format(str(e)))
         return None
 
 
