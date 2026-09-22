@@ -970,7 +970,7 @@ def get_tax_total_from_items(pos_invoice_doc):
         for single_item in pos_invoice_doc.items:
             # _ = item_tax_amount
             _item_tax_amount, tax_percent = get_tax_for_item(
-                pos_invoice_doc.taxes[0].item_wise_tax_detail, single_item.item_code
+                get_tax_wise_detail(pos_invoice_doc, single_item), single_item.item_code
             )
             total_tax = total_tax + (single_item.net_amount * (tax_percent / 100))
         return total_tax
