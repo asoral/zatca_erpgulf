@@ -932,8 +932,6 @@ def company_data_advance(invoice, sales_invoice_doc):
     """
     try:
         company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
-        if company_doc.custom_costcenter == 1 and not sales_invoice_doc.cost_center:
-            frappe.throw("no Cost Center is set in the invoice.Give the feild")
         custom_registration_type = company_doc.custom_registration_type
         custom_company_registration = company_doc.custom_company_registration
 
