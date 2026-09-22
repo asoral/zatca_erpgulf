@@ -682,13 +682,16 @@ def validate_zatca_invoice_before_submission(sales_invoice_doc):
         frappe.throw(f"ZATCA Certificate Parse Error: {str(e)}")
 
     # 6. Certificate VAT Alignment
+    # The certificate belongs to the credential/parent company. The operational
+    # child company may legitimately have a different branch VAT/identity.
     cert_vat = extract_certificate_vat(cert_pem)
-    if False and cert_vat and cert_vat != seller_vat:
+    credential_vat = credential_context.get("credential_vat") or getattr(credential_company_doc, "tax_id", None)
+    if cert_vat and credential_vat and cert_vat != credential_vat:
         frappe.throw(
             _(
-                "ZATCA VAT Mismatch: Invoice Seller VAT ({0}) does not match Certificate VAT ({1}) in Company '{2}'. "
+                "ZATCA VAT Mismatch: Credential Company VAT ({0}) does not match Certificate VAT ({1}) in Company '{2}'. "
                 "Submission blocked to prevent 'invalid-signing-certificate' rejection."
-            ).format(seller_vat, cert_vat, cred_company)
+            ).format(credential_vat, cert_vat, cred_company)
         )
 
     # 7. Customer Buyer ID validation
