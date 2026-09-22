@@ -3,6 +3,7 @@
 import base64
 import frappe
 import requests
+from zatca_erpgulf.zatca_erpgulf.zatca_context import get_zatca_company_context, get_zatca_credential_context
 from zatca_erpgulf.zatca_erpgulf.sales_invoice_with_xmlqr import (
     get_api_url,
     xml_base64_decode,
@@ -216,15 +217,14 @@ def reporting_api_pos_without_xml(
             "invoice": xml_base64_decode(signed_xmlfile_name),
         }
 
-        # Directly retrieve the production CSID from the company's document field
-
-        if pos_invoice_doc.custom_zatca_pos_name:
-            zatca_settings = frappe.get_doc(
-                "Zatca Multiple Setting", pos_invoice_doc.custom_zatca_pos_name
-            )
-            production_csid = zatca_settings.custom_final_auth_csid
-        else:
-            production_csid = company_doc.custom_basic_auth_from_production
+        credential_context = get_zatca_credential_context(
+            get_zatca_company_context(pos_invoice_doc)
+        )
+        production_csid = (
+            credential_context.get("csid")
+            or credential_context.get("credential_company_doc").get("custom_basic_auth_from_production")
+            or ""
+        )
 
         xml_base64 = xml_base64_decode(signed_xmlfile_name)
 
