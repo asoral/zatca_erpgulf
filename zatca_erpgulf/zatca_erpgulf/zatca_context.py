@@ -399,6 +399,8 @@ def validate_buyer_identifier(customer_doc_or_name, is_b2c=False):
 
     # Rule: If B2C and no buyer ID is supplied, omit BT-46 completely
     if is_b2c and not buyer_id:
+        # A B2C customer without an identifier must not emit BT-46.
+        # Ignore a leftover Buyer ID Type value when the actual ID is empty.
         return None
 
     # If neither scheme nor ID is provided, nothing to output
