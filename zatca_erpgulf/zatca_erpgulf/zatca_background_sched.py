@@ -583,7 +583,7 @@ def reporting_api_sales_withoutxml(
                         )
                     )
 
-                if response.status_code not in (200, 202):
+                if response.status_code not in (200, 202, 409):
                     invoice_doc = frappe.get_doc(SALES_INVOICE, invoice_number)
                     invoice_doc.db_set(
                         "custom_uuid",
@@ -745,7 +745,7 @@ def reporting_api_purchase_withoutxml(
                     verify=False
                 )
                 frappe.publish_realtime("hide_gif", user=frappe.session.user)
-                if response.status_code in (400, 405, 406, 409):
+                if response.status_code in (400, 405, 406):
                     invoice_doc = frappe.get_doc(PURCHASE_INVOICE, invoice_number)
                     invoice_doc.db_set(
                         "custom_uuid",
@@ -804,7 +804,7 @@ def reporting_api_purchase_withoutxml(
                         )
                     )
 
-                if response.status_code not in (200, 202):
+                if response.status_code not in (200, 202, 409):
                     invoice_doc = frappe.get_doc(PURCHASE_INVOICE, invoice_number)
                     invoice_doc.db_set(
                         "custom_uuid",
