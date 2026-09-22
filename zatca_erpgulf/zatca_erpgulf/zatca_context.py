@@ -192,12 +192,12 @@ def get_zatca_company_context(doc_or_company, throw_on_missing=True):
 
     invoice_company_doc = frappe.get_doc("Company", invoice_company_name)
 
-    # Check child-company branch architecture:
-    # A child company represents a branch when it is not a group, has custom_costcenter enabled,
-    # and has a parent_company defined.
+    # Check child-company branch architecture.
+    # A non-group Company with a parent Company is an operational branch in
+    # the customer's model. Cost Center is NOT required to resolve ZATCA
+    # credential ownership.
     is_child_branch = bool(
         not invoice_company_doc.is_group
-        and getattr(invoice_company_doc, "custom_costcenter", 0)
         and invoice_company_doc.parent_company
     )
 
