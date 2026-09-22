@@ -7,6 +7,7 @@ import requests
 import frappe
 from pyqrcode import create as qr_create
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+from zatca_erpgulf.zatca_erpgulf.zatca_context import get_zatca_company_context, get_zatca_credential_context
 from zatca_erpgulf.zatca_erpgulf.createxml import (
     xml_tags,
     salesinvoice_data,
@@ -426,13 +427,14 @@ def reporting_api_sales_withoutxml(
         )
         file.save(ignore_permissions=True)
 
-        if sales_invoice_doc.custom_zatca_pos_name:
-            zatca_settings = frappe.get_doc(
-                "Zatca Multiple Setting", sales_invoice_doc.custom_zatca_pos_name
-            )
-            production_csid = zatca_settings.custom_final_auth_csid
-        else:
-            production_csid = company_doc.custom_basic_auth_from_production
+        credential_context = get_zatca_credential_context(
+            get_zatca_company_context(sales_invoice_doc)
+        )
+        production_csid = (
+            credential_context.get("csid")
+            or credential_context.get("credential_company_doc").get("custom_basic_auth_from_production")
+            or ""
+        )
 
         if not production_csid:
             frappe.throw(
@@ -650,13 +652,14 @@ def reporting_api_purchase_withoutxml(
         )
         file.save(ignore_permissions=True)
 
-        if purchase_invoice_doc.custom_zatca_pos_name:
-            zatca_settings = frappe.get_doc(
-                "Zatca Multiple Setting", purchase_invoice_doc.custom_zatca_pos_name
-            )
-            production_csid = zatca_settings.custom_final_auth_csid
-        else:
-            production_csid = company_doc.custom_basic_auth_from_production
+        credential_context = get_zatca_credential_context(
+            get_zatca_company_context(purchase_invoice_doc)
+        )
+        production_csid = (
+            credential_context.get("csid")
+            or credential_context.get("credential_company_doc").get("custom_basic_auth_from_production")
+            or ""
+        )
 
         if not production_csid:
             frappe.throw(
