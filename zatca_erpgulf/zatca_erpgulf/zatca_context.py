@@ -237,8 +237,16 @@ def get_zatca_company_context(doc_or_company, throw_on_missing=True):
         elif hasattr(source_doc, "custom_zatca_pos_name"):
             pos_setting_name = source_doc.custom_zatca_pos_name
 
-    if pos_setting_name and frappe.db.exists("Zatca Multiple Setting", pos_setting_name):
-        multiple_setting_doc = frappe.get_doc("Zatca Multiple Setting", pos_setting_name)
+    if pos_setting_name and (
+        frappe.db.exists("ZATCA Multiple Setting", pos_setting_name)
+        or frappe.db.exists("Zatca Multiple Setting", pos_setting_name)
+    ):
+        multiple_setting_doctype = (
+            "ZATCA Multiple Setting"
+            if frappe.db.exists("ZATCA Multiple Setting", pos_setting_name)
+            else "Zatca Multiple Setting"
+        )
+        multiple_setting_doc = frappe.get_doc(multiple_setting_doctype, pos_setting_name)
         if multiple_setting_doc.get("custom_certficate"):
             cert_raw = (multiple_setting_doc.get("custom_certficate") or "").strip()
         if multiple_setting_doc.get("custom_private_key"):
@@ -299,6 +307,61 @@ def get_zatca_company_context(doc_or_company, throw_on_missing=True):
     }
 
     return context
+
+
+def get_zatca_credential_context(context):
+    """
+    Resolve certificate/private-key/CSID source without changing the
+    operational child-company/parent-company architecture.
+
+    If a POS ZATCA Multiple Setting explicitly says to use the linked
+    Company's certificate/keys, only the cryptographic credential source is
+    switched. Seller/company/address/VAT context remains unchanged.
+    """
+    credential_company_doc = context.get("credential_company_doc")
+    multiple_setting_doc = context.get("multiple_setting")
+    cert_raw = context.get("certificate_raw") or ""
+    key_raw = context.get("private_key_raw") or ""
+    csid = context.get("csid") or ""
+
+    if multiple_setting_doc:
+        use_company_keys = multiple_setting_doc.get(
+            "custom__use_company_certificate__keys"
+        )
+        linked_company = multiple_setting_doc.get("custom_linked_doctype")
+
+        if use_company_keys != 1 and linked_company:
+            if frappe.db.exists("Company", linked_company):
+                linked_company_doc = frappe.get_doc("Company", linked_company)
+                cert_raw = linked_company_doc.get("custom_certificate") or cert_raw
+                key_raw = linked_company_doc.get("custom_private_key") or key_raw
+                csid = (
+                    linked_company_doc.get("custom_basic_auth_from_production")
+                    or linked_company_doc.get("custom_basic_auth_production")
+                    or linked_company_doc.get("custom_final_auth_csid")
+                    or linked_company_doc.get("custom_basic_auth_from_csid")
+                    or linked_company_doc.get("custom_basic_auth_sandbox")
+                    or csid
+                )
+                return {
+                    "credential_company_doc": linked_company_doc,
+                    "certificate_raw": cert_raw,
+                    "certificate": clean_pem_certificate(cert_raw),
+                    "private_key_raw": key_raw,
+                    "private_key": clean_pem_private_key(key_raw),
+                    "csid": csid,
+                    "multiple_setting": multiple_setting_doc,
+                }
+
+    return {
+        "credential_company_doc": credential_company_doc,
+        "certificate_raw": cert_raw,
+        "certificate": clean_pem_certificate(cert_raw),
+        "private_key_raw": key_raw,
+        "private_key": clean_pem_private_key(key_raw),
+        "csid": csid,
+        "multiple_setting": multiple_setting_doc,
+    }
 
 
 def validate_buyer_identifier(customer_doc_or_name, is_b2c=False):
