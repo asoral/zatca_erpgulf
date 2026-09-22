@@ -23,6 +23,7 @@ import asn1
 from zatca_erpgulf.zatca_erpgulf.zatca_context import (
     get_zatca_company_context,
     get_zatca_credential_context,
+    validate_csr_identifier,
 )
 
 SUPPORTED_INVOICES = ["Sales Invoice", "POS Invoice", "Purchase Invoice"]
@@ -56,6 +57,7 @@ def get_csr_data_multiple(zatca_doc):
             frappe.throw("No CSR config found in company settings")
 
         csr_config = parse_csr_config(csr_config_string)
+        validate_csr_identifier(credential_company_doc, csr_config)
 
         csr_values = {
             "csr.common.name": csr_config.get("csr.common.name"),
