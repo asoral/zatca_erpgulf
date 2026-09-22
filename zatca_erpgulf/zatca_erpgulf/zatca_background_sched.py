@@ -8,6 +8,7 @@ import frappe
 from pyqrcode import create as qr_create
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 from zatca_erpgulf.zatca_erpgulf.zatca_context import get_zatca_company_context, get_zatca_credential_context
+from zatca_erpgulf.zatca_erpgulf.event_log import log_zatca_event
 from zatca_erpgulf.zatca_erpgulf.createxml import (
     xml_tags,
     salesinvoice_data,
@@ -461,7 +462,7 @@ def reporting_api_sales_withoutxml(
                     verify=False
                 )
                 frappe.publish_realtime("hide_gif", user=frappe.session.user)
-                if response.status_code in (400, 405, 406, 409):
+                if response.status_code in (400, 405, 406):
                     invoice_doc = frappe.get_doc(SALES_INVOICE, invoice_number)
                     invoice_doc.db_set(
                         "custom_uuid",
@@ -489,6 +490,68 @@ def reporting_api_sales_withoutxml(
                             f"{response.text}"
                         )
                     )
+
+                if response.status_code == 409:
+                    msg = (
+                        "DUPLICATE INVOICE ACCEPTED: <br><br>"
+                        f"Status Code: {response.status_code}<br><br>"
+                        f"Zatca Response: {response.text}<br><br>"
+                    )
+                    log_zatca_event(
+                        invoice_number=invoice_number,
+                        response_text=response.text,
+                        status="Success (Duplicate Invoice)",
+                        uuid=uuid1,
+                        title=f"ZATCA Duplicate Success - {invoice_number}",
+                    )
+                    invoice_doc = frappe.get_doc(SALES_INVOICE, invoice_number)
+                    invoice_doc.db_set(
+                        "custom_uuid", uuid1, commit=True, update_modified=True
+                    )
+                    invoice_doc.db_set(
+                        "custom_zatca_status",
+                        "REPORTED",
+                        commit=True,
+                        update_modified=True,
+                    )
+                    invoice_doc.db_set(
+                        "custom_zatca_full_response",
+                        msg,
+                        commit=True,
+                        update_modified=True,
+                    )
+                    success_log(response.text, uuid1, invoice_number)
+
+                if response.status_code == 409:
+                    msg = (
+                        "DUPLICATE INVOICE ACCEPTED: <br><br>"
+                        f"Status Code: {response.status_code}<br><br>"
+                        f"Zatca Response: {response.text}<br><br>"
+                    )
+                    log_zatca_event(
+                        invoice_number=invoice_number,
+                        response_text=response.text,
+                        status="Success (Duplicate Invoice)",
+                        uuid=uuid1,
+                        title=f"ZATCA Duplicate Success - {invoice_number}",
+                    )
+                    invoice_doc = frappe.get_doc(PURCHASE_INVOICE, invoice_number)
+                    invoice_doc.db_set(
+                        "custom_uuid", uuid1, commit=True, update_modified=True
+                    )
+                    invoice_doc.db_set(
+                        "custom_zatca_status",
+                        "REPORTED",
+                        commit=True,
+                        update_modified=True,
+                    )
+                    invoice_doc.db_set(
+                        "custom_zatca_full_response",
+                        msg,
+                        commit=True,
+                        update_modified=True,
+                    )
+                    success_log(response.text, uuid1, invoice_number)
 
                 if response.status_code in (401, 403, 407, 451):
                     invoice_doc = frappe.get_doc(SALES_INVOICE, invoice_number)
