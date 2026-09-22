@@ -1367,7 +1367,7 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
         company_name = sales_invoice_doc.company
         settings = frappe.get_doc("Company", company_name)
         credential_context = get_zatca_credential_context(
-            get_zatca_company_context(settings)
+            get_zatca_company_context(company_name)
         )
         settings = credential_context.get("credential_company_doc")
         if not settings:
