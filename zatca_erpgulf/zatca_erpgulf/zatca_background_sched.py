@@ -404,9 +404,11 @@ def reporting_api_sales_withoutxml(
             frappe.throw(
                 f"Company with abbreviation {sales_invoice_doc.company} not found."
             )
-        company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+        company_context = get_zatca_company_context(company_doc)
+        credential_context = get_zatca_credential_context(company_context)
+        company_doc = credential_context.get("credential_company_doc")
+        if not company_doc:
+            frappe.throw("Credential Company could not be resolved.")
             company_abbr = company_doc.abbr
         payload = {
             "invoiceHash": encoded_hash,
@@ -687,9 +689,11 @@ def reporting_api_purchase_withoutxml(
             frappe.throw(
                 f"Company with abbreviation {purchase_invoice_doc.company} not found."
             )
-        company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+        company_context = get_zatca_company_context(company_doc)
+        credential_context = get_zatca_credential_context(company_context)
+        company_doc = credential_context.get("credential_company_doc")
+        if not company_doc:
+            frappe.throw("Credential Company could not be resolved.")
             company_abbr = company_doc.abbr
         payload = {
             "invoiceHash": encoded_hash,
