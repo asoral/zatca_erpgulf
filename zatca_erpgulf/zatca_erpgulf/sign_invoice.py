@@ -218,9 +218,11 @@ def reporting_api(
                 f"Company with abbreviation {sales_invoice_doc.company} not found."
             )
         
-        company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+        company_context = get_zatca_company_context(company_doc)
+        credential_context = get_zatca_credential_context(company_context)
+        company_doc = credential_context.get("credential_company_doc")
+        if not company_doc:
+            frappe.throw("Credential Company could not be resolved.")
         payload = {
             "invoiceHash": encoded_hash,
             "uuid": uuid1,
@@ -869,9 +871,12 @@ def zatca_call_compliance(
             frappe.throw(f"Company with abbreviation {company_abbr} not found.")
 
         company_doc = frappe.get_doc("Company", company_name)
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
-            company_abbr = company_doc.abbr
+        company_context = get_zatca_company_context(company_doc)
+        credential_context = get_zatca_credential_context(company_context)
+        company_doc = credential_context.get("credential_company_doc")
+        if not company_doc:
+            frappe.throw("Credential Company could not be resolved.")
+        company_abbr = company_doc.abbr
 
         if company_doc.custom_validation_type == "Simplified Invoice":
             compliance_type = "1"
@@ -998,9 +1003,11 @@ def zatca_background(invoice_number, source_doc, bypass_background_check=False):
         sales_invoice_doc = frappe.get_doc("Sales Invoice", invoice_number)
         company_name = sales_invoice_doc.company
         settings = frappe.get_doc("Company", company_name)
-        if not settings.is_group and settings.custom_costcenter and settings.parent_company:
-            settings = frappe.get_doc("Company", settings.parent_company)
-            
+        company_context = get_zatca_company_context(settings)
+        credential_context = get_zatca_credential_context(company_context)
+        settings = credential_context.get("credential_company_doc")
+        if not settings:
+            frappe.throw("Credential Company could not be resolved.")
         company_abbr = settings.abbr
         
 
@@ -1220,9 +1227,11 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
             frappe.throw(
                 f"Company abbreviation for {sales_invoice_doc.company} not found."
             )
-        company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
+        company_context = get_zatca_company_context(company_doc)
+        credential_context = get_zatca_credential_context(company_context)
+        company_doc = credential_context.get("credential_company_doc")
+        if not company_doc:
+            frappe.throw("Credential Company could not be resolved.")
             company_abbr = company_doc.abbr
 
         if company_doc.custom_zatca_invoice_enabled != 1:
