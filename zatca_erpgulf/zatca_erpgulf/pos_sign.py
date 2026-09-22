@@ -101,10 +101,7 @@ def reporting_api(
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
         context = get_zatca_company_context(pos_invoice_doc)
         credential_context = get_zatca_credential_context(context)
-        production_csid = (
-            credential_context.get("csid")
-            or credential_context.get("credential_company_doc").get("custom_basic_auth_from_production")
-            or ""
+        production_csid = credential_context.get("csid") or ""
         )
 
         # Prepare the payload without JSON formatting
