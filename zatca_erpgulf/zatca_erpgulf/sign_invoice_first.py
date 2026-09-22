@@ -433,394 +433,45 @@ def create_csid(zatca_doc, company_abbr):
 
 
 def create_public_key(company_abbr, source_doc):
-    print("trigggegyshfhjfdhjfdhghjgfhjfdghjfd-----------",company_abbr)
-    """Create a public key based on the company abbreviation and source document."""
+    """Create a public key using the resolved ZATCA credential context."""
     try:
-        # Get the company name using the provided abbreviation
-        company_name = frappe.db.get_value("Company", {"abbr": company_abbr}, "name")
-        if not company_name:
-            frappe.throw(f"Company with abbreviation {company_abbr} not found.")
-
-        # Fetch the company document
-        company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
-
-
-        # Initialize certificate_data_str based on the document type
-        print("compnay doc ---------------------------",company_doc.name,company_abbr)
-        certificate_data_str = ""
-
-        if source_doc:
-            if source_doc.doctype in SUPPORTED_INVOICES:
-                if source_doc.custom_zatca_pos_name:
-                    print("entrybcbcjcddccdfhdkjfkfdgkfjdgdjkf----------")
-                    # Fetch Zatca settings and use its certificate
-
-                    zatca_settings = frappe.get_doc(
-                        "ZATCA Multiple Setting", source_doc.custom_zatca_pos_name
-                    )
-                    print("zatka setting --------------",zatca_settings)
-                    certificate_data_str = zatca_settings.get("custom_certficate", "")
-                else:
-                    # Use company certificate as fallback
-                    certificate_data_str = company_doc.get("custom_certificate", "")
-            elif source_doc.doctype == "Company":
-                certificate_data_str = company_doc.get("custom_certificate", "")
-            else:
-                frappe.throw(f"Unsupported document type: {source_doc.doctype}")
-            print("certificate dadyasfdghfdgfdgdfhdfhdfhd",certificate_data_str)
+        context = get_zatca_company_context(source_doc or company_abbr)
+        credential_context = get_zatca_credential_context(context)
+        certificate_data_str = credential_context.get("certificate_raw") or ""
 
         if not certificate_data_str:
-            frappe.throw("No certificate data found.")
+            frappe.throw(
+                _("No certificate data found for company {0}.").format(
+                    context["operational_company"]
+                )
+            )
 
-        # Build the PEM certificate
-        cert_base64 = f"""
-        -----BEGIN CERTIFICATE-----
-        {certificate_data_str.strip()}
-        -----END CERTIFICATE-----
-        """
-        # Load the certificate and extract the public key
-        cert = x509.load_pem_x509_certificate(cert_base64.encode(), default_backend())
+        cert_base64 = (
+            "-----BEGIN CERTIFICATE-----\\n"
+            + "\\n".join(
+                certificate_data_str.strip()[i : i + 64]
+                for i in range(0, len(certificate_data_str.strip()), 64)
+            )
+            + "\\n-----END CERTIFICATE-----\\n"
+        )
+        cert = x509.load_pem_x509_certificate(
+            cert_base64.encode(), default_backend()
+        )
         public_key = cert.public_key()
         public_key_pem = public_key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
         ).decode()
-        if source_doc.doctype in SUPPORTED_INVOICES:
-            if source_doc.custom_zatca_pos_name:
-                zatca_settings = frappe.get_doc(
-                    "ZATCA Multiple Setting", source_doc.custom_zatca_pos_name
-                )
 
-                if not hasattr(zatca_settings, "custom_public_key"):
-                    frappe.throw(
-                        "Field `custom_public_key` not found in Zatca Multiple Setting Doctype."
-                    )
-
-                zatca_settings.custom_public_key = public_key_pem
-
-                zatca_settings.save(ignore_permissions=True)
-
-            else:
-                if not hasattr(company_doc, "custom_public_key"):
-                    frappe.throw(
-                        "Field `custom_public_key` not found in Company Doctype."
-                    )
-
-                company_doc.custom_public_key = public_key_pem
-                print("company name:---->", company_doc.name)
-                company_doc.save(ignore_permissions=True)
-        elif source_doc.doctype == "Company":
-            if not hasattr(company_doc, "custom_public_key"):
-                frappe.throw("Field `custom_public_key` not found in Company Doctype.")
-
-            company_doc.custom_public_key = public_key_pem
-            company_doc.save(ignore_permissions=True)
-
-        # Ensure data is committed to the database
-        frappe.db.commit()
-
+        if source_doc and source_doc.doctype in SUPPORTED_INVOICES:
+            fieldname = "custom_public_key"
+            meta = frappe.get_meta(source_doc.doctype)
+            if fieldname in [df.fieldname for df in meta.fields]:
+                source_doc.db_set(fieldname, public_key_pem)
+        return public_key_pem
     except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
-        frappe.throw("Error occurred while creating public key: " + str(e))
-
-
-def removetags(finalzatcaxml):
-    """remove the unwanted tags from created xml"""
-    try:
-        # Code corrected by Farook K - ERPGulf
-        xml_file = MyTree.fromstring(finalzatcaxml)
-        xsl_file = MyTree.fromstring(
-            """<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
-                                    xmlns:xs="http://www.w3.org/2001/XMLSchema"
-                                    xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
-                                    xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
-                                    xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
-                                    xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2"
-                                    exclude-result-prefixes="xs"
-                                    version="2.0">
-                                    <xsl:output omit-xml-declaration="yes" encoding="utf-8" indent="no"/>
-                                    <xsl:template match="node() | @*">
-                                        <xsl:copy>
-                                            <xsl:apply-templates select="node() | @*"/>
-                                        </xsl:copy>
-                                    </xsl:template>
-                                    <xsl:template match="//*[local-name()='Invoice']//*[local-name()='UBLExtensions']"></xsl:template>
-                                    <xsl:template match="//*[local-name()='AdditionalDocumentReference'][cbc:ID[normalize-space(text()) = 'QR']]"></xsl:template>
-                                        <xsl:template match="//*[local-name()='Invoice']/*[local-name()='Signature']"></xsl:template>
-                                    </xsl:stylesheet>"""
-        )
-        transform = MyTree.XSLT(xsl_file.getroottree())
-        transformed_xml = transform(xml_file.getroottree())
-        return transformed_xml
-    except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
-        frappe.throw("error occurred win removing tags " + str(e))
+        frappe.throw(_("Error in creating public key: {0}").format(str(e)))
         return None
-
-
-def canonicalize_xml(tag_removed_xml):
-    """canonicalisation of the xml"""
-    try:
-        canonical_xml = etree.tostring(tag_removed_xml, method="c14n").decode()
-        return canonical_xml
-    except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
-        frappe.throw("error occurred in canonicalise xml " + str(e))
-        return None
-
-
-def getinvoicehash(canonicalized_xml):
-    """Getting the invoice hash of the xml"""
-    try:
-        hash_object = hashlib.sha256(canonicalized_xml.encode())
-        hash_hex = hash_object.hexdigest()
-        # print(hash_hex)
-        hash_base64 = base64.b64encode(bytes.fromhex(hash_hex)).decode("utf-8")
-        return hash_hex, hash_base64
-    except Exception as e:
-        raise frappe.ValidationError(
-            f"error occurred while invoice hash {str(e)}"
-        ) from e
-
-
-def digital_signature(hash1, company_abbr, source_doc):
-    """find digital signature of xml"""
-    try:
-        context = get_zatca_company_context(source_doc or company_abbr)
-        credential_context = get_zatca_credential_context(context)
-        private_key_data_str = credential_context["private_key"]
-
-        if not private_key_data_str:
-            frappe.throw(f"No private key data found for company {context['operational_company']}.")
-        private_key_bytes = private_key_data_str.encode("utf-8")
-        private_key = serialization.load_pem_private_key(
-            private_key_bytes, password=None, backend=default_backend()
-        )
-        hash_bytes = bytes.fromhex(hash1)
-        signature = private_key.sign(hash_bytes, ec.ECDSA(hashes.SHA256()))
-        encoded_signature = base64.b64encode(signature).decode()
-
-        return encoded_signature
-
-    except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
-        frappe.throw("Error in digital signature: " + str(e))
-        return None
-
-
-def extract_certificate_details(company_abbr, source_doc):
-    """extracting the certificate details from the certificate data"""
-    try:
-        context = get_zatca_company_context(source_doc or company_abbr)
-        credential_context = get_zatca_credential_context(context)
-        formatted_certificate = credential_context["certificate"]
-
-        if not formatted_certificate:
-            frappe.throw(f"No valid certificate content found for company {context['operational_company']}")
-
-        certificate_bytes = formatted_certificate.encode("utf-8")
-        cert = x509.load_pem_x509_certificate(certificate_bytes, default_backend())
-        formatted_issuer_name = cert.issuer.rfc4514_string()
-        issuer_name = ", ".join([x.strip() for x in formatted_issuer_name.split(",")])
-        serial_number = cert.serial_number
-        return issuer_name, serial_number
-
-    except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
-        frappe.throw("Error in extracting certificate details: " + str(e))
-        return None
-
-
-def certificate_hash(company_abbr, source_doc):
-    """Find the certificate hash and returning the value"""
-    try:
-        context = get_zatca_company_context(source_doc or company_abbr)
-        credential_context = get_zatca_credential_context(context)
-        certificate_data = (credential_context.get("certificate_raw") or "").strip()
-
-        if not certificate_data:
-            frappe.throw(f"No certificate data found for company {context['operational_company']}")
-
-        # Calculate the SHA-256 hash of the certificate data
-        certificate_data_bytes = certificate_data.encode("utf-8")
-        sha256_hash = hashlib.sha256(certificate_data_bytes).hexdigest()
-        # Encode the hash in base64
-        base64_encoded_hash = base64.b64encode(sha256_hash.encode("utf-8")).decode(
-            "utf-8"
-        )
-        return base64_encoded_hash
-
-    except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
-        frappe.throw("Error in obtaining certificate hash: " + str(e))
-        return None
-
-
-def xml_base64_decode(signed_xmlfile_name):
-    """xml base64 decode"""
-    try:
-        with open(signed_xmlfile_name, "r", encoding="utf-8") as file:
-            xml = file.read().lstrip()
-            base64_encoded = base64.b64encode(xml.encode("utf-8"))
-            base64_decoded = base64_encoded.decode("utf-8")
-            return base64_decoded
-    except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
-        frappe.msgprint("Error in xml base64:  " + str(e))
-        return None
-
-
-def signxml_modify(company_abbr, source_doc):
-
-    """modify the signed xml by adding the values like signing time,serial number etc"""
-    try:
-        encoded_certificate_hash = certificate_hash(company_abbr, source_doc)
-        issuer_name, serial_number = extract_certificate_details(
-            company_abbr, source_doc
-        )
-        original_invoice_xml = etree.parse(
-            frappe.local.site + "/private/files/finalzatcaxml.xml"
-        )
-        root = original_invoice_xml.getroot()
-        namespaces = {
-            "ext": "urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2",
-            "sig": "urn:oasis:names:specification:ubl:schema:xsd:CommonSignatureComponents-2",
-            "sac": "urn:oasis:names:specification:ubl:schema:xsd:SignatureAggregateComponents-2",
-            "xades": "http://uri.etsi.org/01903/v1.3.2#",
-            "ds": "http://www.w3.org/2000/09/xmldsig#",
-        }
-
-        xpath_dv = "ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent/sig:UBLDocumentSignatures/sac:SignatureInformation/ds:Signature/ds:Object/xades:QualifyingProperties/xades:SignedProperties/xades:SignedSignatureProperties/xades:SigningCertificate/xades:Cert/xades:CertDigest/ds:DigestValue"
-        xpath_signtime = "ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent/sig:UBLDocumentSignatures/sac:SignatureInformation/ds:Signature/ds:Object/xades:QualifyingProperties/xades:SignedProperties/xades:SignedSignatureProperties/xades:SigningTime"
-        xpath_issuername = "ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent/sig:UBLDocumentSignatures/sac:SignatureInformation/ds:Signature/ds:Object/xades:QualifyingProperties/xades:SignedProperties/xades:SignedSignatureProperties/xades:SigningCertificate/xades:Cert/xades:IssuerSerial/ds:X509IssuerName"
-        xpath_serialnum = "ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent/sig:UBLDocumentSignatures/sac:SignatureInformation/ds:Signature/ds:Object/xades:QualifyingProperties/xades:SignedProperties//xades:SignedSignatureProperties/xades:SigningCertificate/xades:Cert/xades:IssuerSerial/ds:X509SerialNumber"
-        element_dv = root.find(xpath_dv, namespaces)
-        element_st = root.find(xpath_signtime, namespaces)
-        element_in = root.find(xpath_issuername, namespaces)
-        element_sn = root.find(xpath_serialnum, namespaces)
-        element_dv.text = encoded_certificate_hash
-        element_st.text = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
-        signing_time = element_st.text
-        element_in.text = issuer_name
-        element_sn.text = str(serial_number)
-        with open(frappe.local.site + "/private/files/after_step_4.xml", "wb") as file:
-            original_invoice_xml.write(
-                file,
-                encoding="utf-8",
-                xml_declaration=True,
-            )
-        return namespaces, signing_time
-    except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
-        frappe.throw(" error in modification of xml sign part: " + str(e))
-        return None
-
-
-def generate_signed_properties_hash(
-    signing_time, issuer_name, serial_number, encoded_certificate_hash
-):
-    """generate the signed property hash of the xml using a part
-    of the xml"""
-    try:
-        xml_string = """<xades:SignedProperties xmlns:xades="http://uri.etsi.org/01903/v1.3.2#" Id="xadesSignedProperties">
-                                    <xades:SignedSignatureProperties>
-                                        <xades:SigningTime>{signing_time}</xades:SigningTime>
-                                        <xades:SigningCertificate>
-                                            <xades:Cert>
-                                                <xades:CertDigest>
-                                                    <ds:DigestMethod xmlns:ds="http://www.w3.org/2000/09/xmldsig#" Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
-                                                    <ds:DigestValue xmlns:ds="http://www.w3.org/2000/09/xmldsig#">{certificate_hash}</ds:DigestValue>
-                                                </xades:CertDigest>
-                                                <xades:IssuerSerial>
-                                                    <ds:X509IssuerName xmlns:ds="http://www.w3.org/2000/09/xmldsig#">{issuer_name}</ds:X509IssuerName>
-                                                    <ds:X509SerialNumber xmlns:ds="http://www.w3.org/2000/09/xmldsig#">{serial_number}</ds:X509SerialNumber>
-                                                </xades:IssuerSerial>
-                                            </xades:Cert>
-                                        </xades:SigningCertificate>
-                                    </xades:SignedSignatureProperties>
-                                </xades:SignedProperties>"""
-        xml_string_rendered = xml_string.format(
-            signing_time=signing_time,
-            certificate_hash=encoded_certificate_hash,
-            issuer_name=issuer_name,
-            serial_number=str(serial_number),
-        )
-        utf8_bytes = xml_string_rendered.encode("utf-8")
-        hash_object = hashlib.sha256(utf8_bytes)
-        hex_sha256 = hash_object.hexdigest()
-        signed_properties_base64 = base64.b64encode(hex_sha256.encode("utf-8")).decode(
-            "utf-8"
-        )
-        return signed_properties_base64
-    except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
-        frappe.throw(" error in generating signed properties hash: " + str(e))
-        return None
-
-
-def populate_the_ubl_extensions_output(
-    encoded_signature,
-    namespaces,
-    signed_properties_base64,
-    encoded_hash,
-    company_abbr,
-    source_doc,
-):
-    """populate the ubl extension output by giving the signature values and digest values"""
-    try:
-        updated_invoice_xml = etree.parse(
-            frappe.local.site + "/private/files/after_step_4.xml"
-        )
-        root3 = updated_invoice_xml.getroot()
-        company_name = frappe.db.get_value("Company", {"abbr": company_abbr}, "name")
-        if not company_name:
-            frappe.throw(f"Company with abbreviation {company_abbr} not found.")
-
-        company_doc = frappe.get_doc("Company", company_name)
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_doc = frappe.get_doc("Company",company_doc.parent_company)
-            company_name = company_doc.name
-
-        if source_doc:
-            if source_doc.doctype in SUPPORTED_INVOICES:
-                # Use certificate from the company document for Sales Invoice
-                if source_doc.custom_zatca_pos_name:
-                    # Fetch Zatca settings and use its certificate
-                    zatca_settings = frappe.get_doc(
-                        "ZATCA Multiple Setting", source_doc.custom_zatca_pos_name
-                    )
-                    certificate_data_str = zatca_settings.get("custom_certficate")
-                else:
-                    certificate_data_str = company_doc.get("custom_certificate")
-            elif source_doc.doctype == "Company":
-                certificate_data_str = company_doc.get("custom_certificate")
-
-        if not certificate_data_str:
-            frappe.throw(f"No certificate data found for company {company_name}")
-        content = certificate_data_str.strip()
-
-        if not content:
-            frappe.throw(
-                f"No valid certificate content found for company {company_name}"
-            )
-
-        xpath_signvalue = "ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent/sig:UBLDocumentSignatures/sac:SignatureInformation/ds:Signature/ds:SignatureValue"
-        xpath_x509certi = "ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent/sig:UBLDocumentSignatures/sac:SignatureInformation/ds:Signature/ds:KeyInfo/ds:X509Data/ds:X509Certificate"
-        xpath_digvalue = "ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent/sig:UBLDocumentSignatures/sac:SignatureInformation/ds:Signature/ds:SignedInfo/ds:Reference[@URI='#xadesSignedProperties']/ds:DigestValue"
-        xpath_digvalue2 = "ext:UBLExtensions/ext:UBLExtension/ext:ExtensionContent/sig:UBLDocumentSignatures/sac:SignatureInformation/ds:Signature/ds:SignedInfo/ds:Reference[@Id='invoiceSignedData']/ds:DigestValue"
-
-        signvalue6 = root3.find(xpath_signvalue, namespaces)
-        x509certificate6 = root3.find(xpath_x509certi, namespaces)
-        digestvalue6 = root3.find(xpath_digvalue, namespaces)
-        digestvalue6_2 = root3.find(xpath_digvalue2, namespaces)
-
-        signvalue6.text = encoded_signature
-        x509certificate6.text = content
-        digestvalue6.text = signed_properties_base64
-        digestvalue6_2.text = encoded_hash
-
-        with open(
-            frappe.local.site + "/private/files/final_xml_after_sign.xml", "wb"
-        ) as file:
-            updated_invoice_xml.write(file, encoding="utf-8", xml_declaration=True)
-
-    except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
-        frappe.throw("Error in populating UBL extension output: " + str(e))
-        return
-
 
 def extract_public_key_data(company_abbr, source_doc):
     """extract public key"""
