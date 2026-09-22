@@ -15,6 +15,10 @@ import frappe
 import requests
 from pyqrcode import create as qr_create
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+from zatca_erpgulf.zatca_erpgulf.zatca_context import (
+    get_zatca_company_context,
+    validate_zatca_invoice_before_submission,
+)
 from zatca_erpgulf.zatca_erpgulf.createxml import (
     xml_tags,
     salesinvoice_data,
@@ -88,18 +92,18 @@ def xml_base64_decode(signed_xmlfile_name):
 
 
 def get_api_url(company_abbr, base_url):
-    """There are many api susing in zatca which can be defined by a feild in settings"""
+    """Resolve ZATCA API URL based on company credentials and environment."""
     try:
-        company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_abbr = frappe.db.get_value('Company', company_doc.parent_company, 'abbr')
+        context = get_zatca_company_context(company_abbr)
+        company_doc = context["credential_company_doc"]
+        env = context["environment"]
 
-        if company_doc.custom_select == "Sandbox":
-            url = company_doc.custom_sandbox_url + base_url
-        elif company_doc.custom_select == "Simulation":
-            url = company_doc.custom_simulation_url + base_url
+        if env == "sandbox":
+            url = (company_doc.get("custom_sandbox_url") or "") + base_url
+        elif env == "simulation":
+            url = (company_doc.get("custom_simulation_url") or "") + base_url
         else:
-            url = company_doc.custom_production_url + base_url
+            url = (company_doc.get("custom_production_url") or "") + base_url
 
         return url
 
@@ -675,18 +679,12 @@ def zatca_call(
             frappe.throw("Invoice Number is NOT Valid: " + str(invoice_number))
         invoice = xml_tags()
         invoice, uuid1, sales_invoice_doc = salesinvoice_data(invoice, invoice_number)
-        # Get the company abbreviation
-        company_abbr = frappe.db.get_value(
-            "Company", {"name": sales_invoice_doc.company}, "abbr"
-        )
-        # td = frappe.new_doc("ToDo")
-        # td.description = company_abbr
-        # td.save()
-        company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_abbr = frappe.db.get_value(
-                "Company", {"name": company_doc.parent_company}, "abbr"
-            )
+
+        context = get_zatca_company_context(sales_invoice_doc)
+        company_abbr = context["credential_abbr"]
+
+        if compliance_type == "0":
+            validate_zatca_invoice_before_submission(sales_invoice_doc)
 
         customer_doc = frappe.get_doc("Customer", sales_invoice_doc.customer)
 

@@ -9,6 +9,10 @@ import xml.etree.ElementTree as ET
 import frappe
 from frappe.utils.data import get_time
 from zatca_erpgulf.zatca_erpgulf.country_code import country_code_mapping
+from zatca_erpgulf.zatca_erpgulf.zatca_context import (
+    get_zatca_company_context,
+    validate_buyer_identifier,
+)
 
 CBC_ID = "cbc:ID"
 DS_TRANSFORM = "ds:Transform"
@@ -62,7 +66,9 @@ def billing_reference_for_credit_and_debit_note(invoice, sales_invoice_doc):
         cbc_id13 = ET.SubElement(cac_invoicedocumentreference, CBC_ID)
         cbc_id13.text = (
             sales_invoice_doc.return_against
-        )  # field from return against invoice.
+            or getattr(sales_invoice_doc, "custom_return_against_for_zatca", None)
+            or ""
+        )  # field from return against invoice or fallback.
 
         return invoice
     except (ValueError, KeyError, AttributeError) as error:
@@ -344,13 +350,15 @@ def invoice_typecode_simplified(invoice, sales_invoice_doc):
         ]
         five_digit_code = "".join("1" if checkbox else "0" for checkbox in checkbox_map)
         final_code = base_code + five_digit_code
-        if sales_invoice_doc.is_return == 0:
-            print("------------------->purchase")
-            cbc_invoicetypecode.set("name", final_code)
-            cbc_invoicetypecode.text = "388"
-        elif sales_invoice_doc.is_return == 1:
+        if sales_invoice_doc.is_return == 1:
             cbc_invoicetypecode.set("name", final_code)
             cbc_invoicetypecode.text = "381"
+        elif getattr(sales_invoice_doc, "is_debit_note", 0) == 1:
+            cbc_invoicetypecode.set("name", final_code)
+            cbc_invoicetypecode.text = "383"
+        else:
+            cbc_invoicetypecode.set("name", final_code)
+            cbc_invoicetypecode.text = "388"
 
         return invoice
     except (ET.ParseError, AttributeError, ValueError) as e:
@@ -375,12 +383,15 @@ def invoice_typecode_standard(invoice, sales_invoice_doc):
 
         five_digit_code = "".join("1" if checkbox else "0" for checkbox in checkbox_map)
         final_code = base_code + five_digit_code
-        if sales_invoice_doc.is_return == 0:
-            cbc_invoicetypecode.set("name", final_code)
-            cbc_invoicetypecode.text = "388"
-        elif sales_invoice_doc.is_return == 1:
+        if sales_invoice_doc.is_return == 1:
             cbc_invoicetypecode.set("name", final_code)
             cbc_invoicetypecode.text = "381"
+        elif getattr(sales_invoice_doc, "is_debit_note", 0) == 1:
+            cbc_invoicetypecode.set("name", final_code)
+            cbc_invoicetypecode.text = "383"
+        else:
+            cbc_invoicetypecode.set("name", final_code)
+            cbc_invoicetypecode.text = "388"
         return invoice
     except (ET.ParseError, AttributeError, ValueError) as e:
         frappe.throw(f"Error in standard invoice type code: {e}")
@@ -397,7 +408,7 @@ def doc_reference(invoice, sales_invoice_doc, invoice_number):
         cbc_documentcurrencycode.text = sales_invoice_doc.currency
         cbc_taxcurrencycode = ET.SubElement(invoice, "cbc:TaxCurrencyCode")
         cbc_taxcurrencycode.text = "SAR"  # SAR is as zatca requires tax amount in SAR
-        if sales_invoice_doc.is_return == 1:
+        if sales_invoice_doc.is_return == 1 or getattr(sales_invoice_doc, "is_debit_note", 0) == 1:
             invoice = billing_reference_for_credit_and_debit_note(
                 invoice, sales_invoice_doc
             )
@@ -596,26 +607,10 @@ def get_address(sales_invoice_doc, company_doc):
 def company_data(invoice, sales_invoice_doc):
     """
     Adds company data elements to the XML invoice, including supplier details, address,
-    and tax information.
+    and tax information resolved through centralized ZATCA context.
     """
     try:
-        company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
-        if not company_doc.is_group and company_doc.custom_costcenter and company_doc.parent_company:
-            company_doc = frappe.get_doc("Company", company_doc.parent_company)
-        if company_doc.custom_costcenter == 1 and not sales_invoice_doc.company:
-            frappe.throw("No Company is set in the invoice.Give the feild")
-        # Determine whether to fetch data from Cost Center or Company
-        if company_doc.custom_costcenter == 1 and sales_invoice_doc.company:
-            cost_center_doc = frappe.get_doc(
-                "Company", sales_invoice_doc.company
-            )
-            custom_registration_type = cost_center_doc.custom_registration_type
-            custom_company_registration = (
-                cost_center_doc.custom_company_registration
-            )
-        else:
-            custom_registration_type = company_doc.custom_registration_type
-            custom_company_registration = company_doc.custom_company_registration
+        context = get_zatca_company_context(sales_invoice_doc)
 
         cac_accountingsupplierparty = ET.SubElement(
             invoice, "cac:AccountingSupplierParty"
@@ -623,31 +618,35 @@ def company_data(invoice, sales_invoice_doc):
         cac_party_1 = ET.SubElement(cac_accountingsupplierparty, "cac:Party")
         cac_partyidentification = ET.SubElement(cac_party_1, "cac:PartyIdentification")
         cbc_id_2 = ET.SubElement(cac_partyidentification, CBC_ID)
-        cbc_id_2.set("schemeID", custom_registration_type)
-        cbc_id_2.text = custom_company_registration
+        cbc_id_2.set("schemeID", context["registration_type"] or "CRN")
+        cbc_id_2.text = context["registration_number"] or ""
 
-        # Get the appropriate address
-        address = get_address(sales_invoice_doc, company_doc)
+        # Get the appropriate address from context
+        address = context["address"]
+        if not address:
+            frappe.throw(
+                f"ZATCA requires a proper address. Please add an address for Company: {context['operational_company']}."
+            )
 
         cac_postaladdress = ET.SubElement(cac_party_1, "cac:PostalAddress")
         cbc_streetname = ET.SubElement(cac_postaladdress, "cbc:StreetName")
-        cbc_streetname.text = address.address_line1
+        cbc_streetname.text = getattr(address, "address_line1", None) or ""
         cbc_buildingnumber = ET.SubElement(cac_postaladdress, "cbc:BuildingNumber")
-        cbc_buildingnumber.text = address.custom_building_number
+        cbc_buildingnumber.text = str(getattr(address, "custom_building_number", None) or "")
         cbc_plotidentification = ET.SubElement(
             cac_postaladdress, "cbc:PlotIdentification"
         )
-        cbc_plotidentification.text = address.address_line1
+        cbc_plotidentification.text = getattr(address, "address_line1", None) or ""
         cbc_citysubdivisionname = ET.SubElement(
             cac_postaladdress, "cbc:CitySubdivisionName"
         )
-        cbc_citysubdivisionname.text = address.address_line2
+        cbc_citysubdivisionname.text = getattr(address, "address_line2", None) or ""
         cbc_cityname = ET.SubElement(cac_postaladdress, "cbc:CityName")
-        cbc_cityname.text = address.city
+        cbc_cityname.text = getattr(address, "city", None) or ""
         cbc_postalzone = ET.SubElement(cac_postaladdress, "cbc:PostalZone")
-        cbc_postalzone.text = address.pincode
+        cbc_postalzone.text = getattr(address, "pincode", None) or ""
         cbc_countrysubentity = ET.SubElement(cac_postaladdress, "cbc:CountrySubentity")
-        cbc_countrysubentity.text = address.state
+        cbc_countrysubentity.text = getattr(address, "state", None) or ""
 
         cac_country = ET.SubElement(cac_postaladdress, "cac:Country")
         cbc_identificationcode = ET.SubElement(cac_country, "cbc:IdentificationCode")
@@ -655,7 +654,7 @@ def company_data(invoice, sales_invoice_doc):
 
         cac_partytaxscheme = ET.SubElement(cac_party_1, "cac:PartyTaxScheme")
         cbc_companyid = ET.SubElement(cac_partytaxscheme, "cbc:CompanyID")
-        cbc_companyid.text = company_doc.tax_id
+        cbc_companyid.text = context["vat_number"]
 
         cac_taxscheme = ET.SubElement(cac_partytaxscheme, "cac:TaxScheme")
         cbc_id_3 = ET.SubElement(cac_taxscheme, CBC_ID)
@@ -665,7 +664,7 @@ def company_data(invoice, sales_invoice_doc):
         cbc_registrationname = ET.SubElement(
             cac_partylegalentity, "cbc:RegistrationName"
         )
-        cbc_registrationname.text = sales_invoice_doc.company
+        cbc_registrationname.text = context["seller_name"]
 
         return invoice
     except (ET.ParseError, AttributeError, ValueError, frappe.DoesNotExistError) as e:
@@ -675,24 +674,28 @@ def company_data(invoice, sales_invoice_doc):
 
 def customer_data(invoice, sales_invoice_doc):
     """
-    customer data of address and need values
+    Customer data of address and required values with BT-46 validation.
     """
     try:
         customer_doc = frappe.get_doc("Customer", sales_invoice_doc.customer)
-        # frappe.throw(str(customer_doc))
         cac_accountingcustomerparty = ET.SubElement(
             invoice, "cac:AccountingCustomerParty"
         )
         cac_party_2 = ET.SubElement(cac_accountingcustomerparty, "cac:Party")
-        cac_partyidentification_1 = ET.SubElement(
-            cac_party_2, "cac:PartyIdentification"
-        )
-        cbc_id_4 = ET.SubElement(cac_partyidentification_1, CBC_ID)
-        cbc_id_4.set("schemeID", str(customer_doc.custom_buyer_id_type))
-        cbc_id_4.text = customer_doc.custom_buyer_id
+
+        is_b2c = bool(customer_doc.custom_b2c)
+        buyer_id_info = validate_buyer_identifier(customer_doc, is_b2c=is_b2c)
+        if buyer_id_info:
+            cac_partyidentification_1 = ET.SubElement(
+                cac_party_2, "cac:PartyIdentification"
+            )
+            cbc_id_4 = ET.SubElement(cac_partyidentification_1, CBC_ID)
+            cbc_id_4.set("schemeID", str(buyer_id_info["scheme"]))
+            cbc_id_4.text = str(buyer_id_info["id"])
+
         country_dict = country_code_mapping()
         address = None
-        if customer_doc.custom_b2c != 1:
+        if not is_b2c:
             if int(frappe.__version__.split(".", maxsplit=1)[0]) == 13:
                 if sales_invoice_doc.customer_address:
                     address = frappe.get_doc(
@@ -708,7 +711,6 @@ def customer_data(invoice, sales_invoice_doc):
                 frappe.throw("Customer address is mandatory for non-B2C customers.")
 
             cac_postaladdress_1 = ET.SubElement(cac_party_2, "cac:PostalAddress")
-            # frappe.throw(address.address_line1)
             if address.address_line1:
                 cbc_streetname_1 = ET.SubElement(cac_postaladdress_1, "cbc:StreetName")
                 cbc_streetname_1.text = address.address_line1
@@ -754,7 +756,6 @@ def customer_data(invoice, sales_invoice_doc):
             cbc_identificationcode_1 = ET.SubElement(
                 cac_country_1, "cbc:IdentificationCode"
             )
-            # frappe.throw(country_dict[address.country.lower()])
             if sales_invoice_doc.custom_zatca_export_invoice == 1:
                 if address.country and address.country.lower() in country_dict:
                     cbc_identificationcode_1.text = country_dict[
@@ -762,18 +763,26 @@ def customer_data(invoice, sales_invoice_doc):
                     ]
             else:
                 cbc_identificationcode_1.text = "SA"
-        cac_partytaxscheme_1 = ET.SubElement(cac_party_2, "cac:PartyTaxScheme")
 
-        cbc_company_id = ET.SubElement(cac_partytaxscheme_1, "cbc:CompanyID")
-        cbc_company_id.text = customer_doc.tax_id
+        cac_partytaxscheme_1 = ET.SubElement(cac_party_2, "cac:PartyTaxScheme")
+        # BT-48 CompanyID: only emit when tax_id present and country is Saudi Arabia (BR-KSA-44)
+        if (
+            customer_doc.tax_id
+            and (
+                is_b2c
+                or (
+                    address
+                    and getattr(address, "country", "") in ("Saudi Arabia", "SA")
+                )
+            )
+        ):
+            cbc_company_id = ET.SubElement(cac_partytaxscheme_1, "cbc:CompanyID")
+            cbc_company_id.text = customer_doc.tax_id
 
         cac_taxscheme_1 = ET.SubElement(cac_partytaxscheme_1, "cac:TaxScheme")
         cbc_id_5 = ET.SubElement(cac_taxscheme_1, "cbc:ID")
         cbc_id_5.text = "VAT"
-        # cac_partytaxscheme_1 = ET.SubElement(cac_party_2, "cac:PartyTaxScheme")
-        # cac_taxscheme_1 = ET.SubElement(cac_partytaxscheme_1, "cac:TaxScheme")
-        # cbc_id_5 = ET.SubElement(cac_taxscheme_1, CBC_ID)
-        # cbc_id_5.text = "VAT"
+
         cac_partylegalentity_1 = ET.SubElement(cac_party_2, "cac:PartyLegalEntity")
         cbc_registrationname_1 = ET.SubElement(
             cac_partylegalentity_1, "cbc:RegistrationName"

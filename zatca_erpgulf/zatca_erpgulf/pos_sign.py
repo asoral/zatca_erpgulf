@@ -9,6 +9,10 @@ import base64
 import json
 import requests
 import frappe
+from zatca_erpgulf.zatca_erpgulf.zatca_context import (
+    get_zatca_company_context,
+    validate_zatca_invoice_before_submission,
+)
 from zatca_erpgulf.zatca_erpgulf.posxml import (
     xml_tags,
     salesinvoice_data,
@@ -539,17 +543,11 @@ def zatca_call(
         invoice, uuid1, pos_invoice_doc = salesinvoice_data(invoice, invoice_number)
 
         
-        company_abbr = frappe.db.get_value(
-            "Company", {"name": pos_invoice_doc.company}, "abbr"
-        )
-        # Get the company abbreviation
-        company_doc = frappe.get_doc("Company",pos_invoice_doc.company)
-        if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            company_abbr = frappe.db.get_value(
-                "Company", {"name": company_doc.parent_company}, "abbr"
-            )
+        context = get_zatca_company_context(pos_invoice_doc)
+        company_abbr = context["credential_abbr"]
 
-        
+        if compliance_type == "0":
+            validate_zatca_invoice_before_submission(pos_invoice_doc)
 
         customer_doc = frappe.get_doc("Customer", pos_invoice_doc.customer)
 
