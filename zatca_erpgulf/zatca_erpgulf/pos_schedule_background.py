@@ -78,10 +78,12 @@ def zatca_call_pos_without_xml_background(
         )
 
         company_doc = frappe.get_doc("Company", pos_invoice_doc.company)
-        if not company_doc.is_group and company_doc.parent_company:
-            company_abbr = frappe.db.get_value(
-                "Company", {"name": company_doc.parent_company}, "abbr"
-            )
+        credential_context = get_zatca_credential_context(
+            get_zatca_company_context(pos_invoice_doc)
+        )
+        credential_company_doc = credential_context.get("credential_company_doc")
+        if credential_company_doc:
+            company_abbr = credential_company_doc.abbr
 
         customer_doc = frappe.get_doc("Customer", pos_invoice_doc.customer)
 
