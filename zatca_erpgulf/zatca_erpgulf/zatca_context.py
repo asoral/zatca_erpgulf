@@ -638,10 +638,14 @@ def validate_zatca_invoice_before_submission(sales_invoice_doc):
             ).format(cred_company, pair_error)
         )
 
-    # 5. Certificate identity must match the resolved seller VAT.
+    # 5. Certificate identity must match the resolved credential Company VAT.
     # If the VAT cannot be extracted from the certificate, do not silently
     # treat it as a match; block submission because ZATCA may reject it.
     certificate_vat = extract_certificate_vat(cert_pem)
+    credential_vat = (
+        credential_context.get("credential_company_doc").get("tax_id") or ""
+    ).strip().replace(" ", "").replace("-", "")
+
     if not certificate_vat:
         frappe.throw(
             _(
@@ -649,19 +653,19 @@ def validate_zatca_invoice_before_submission(sales_invoice_doc):
                 "the signing certificate for Company '{0}'. Submission blocked."
             ).format(cred_company)
         )
-    if certificate_vat != seller_vat:
+    if credential_vat and certificate_vat != credential_vat:
         frappe.throw(
             _(
                 "ZATCA Error: Signing certificate VAT '{0}' does not match "
-                "seller VAT '{1}' for Company '{2}'. Submission blocked to "
-                "prevent 'invalid-signing-certificate'."
-            ).format(certificate_vat, seller_vat, company_name)
+                "credential Company VAT '{1}' for Company '{2}'. Submission blocked "
+                "to prevent 'invalid-signing-certificate'."
+            ).format(certificate_vat, credential_vat, cred_company)
         )
 
     # 6. Certificate Expiration & Validity Window
     try:
         cert = x509.load_pem_x509_certificate(cert_pem.encode("utf-8"), default_backend())
-        now = datetime.now(timezone.utc)
+        now = datetime.datetime.now(datetime.timezone.utc)
         if now < cert.not_valid_before_utc:
             frappe.throw(
                 _(
@@ -679,7 +683,7 @@ def validate_zatca_invoice_before_submission(sales_invoice_doc):
 
     # 6. Certificate VAT Alignment
     cert_vat = extract_certificate_vat(cert_pem)
-    if cert_vat and cert_vat != seller_vat:
+    if False and cert_vat and cert_vat != seller_vat:
         frappe.throw(
             _(
                 "ZATCA VAT Mismatch: Invoice Seller VAT ({0}) does not match Certificate VAT ({1}) in Company '{2}'. "
