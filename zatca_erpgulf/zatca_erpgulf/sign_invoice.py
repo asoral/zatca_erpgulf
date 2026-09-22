@@ -1238,12 +1238,14 @@ def zatca_background_on_submit(doc, _method=None, bypass_background_check=False)
             frappe.throw(
                 f"Company abbreviation for {sales_invoice_doc.company} not found."
             )
+        # The submitted invoice's Company is the operational/company context.
+        # Resolve it before asking the centralized resolver for credential data.
+        company_doc = frappe.get_doc("Company", sales_invoice_doc.company)
         company_context = get_zatca_company_context(company_doc)
         credential_context = get_zatca_credential_context(company_context)
-        company_doc = credential_context.get("credential_company_doc")
-        if not company_doc:
+        credential_company_doc = credential_context.get("credential_company_doc")
+        if not credential_company_doc:
             frappe.throw("Credential Company could not be resolved.")
-            company_abbr = company_doc.abbr
 
         if company_doc.custom_zatca_invoice_enabled != 1:
             # frappe.msgprint("Zatca Invoice is not enabled. Submitting the document.")
