@@ -837,7 +837,11 @@ def clearance_api(
 
             data = response.json()
             base64_xml = data.get("clearedInvoice")
-            xml_cleared = base64.b64decode(base64_xml).decode("utf-8")
+            if base64_xml:
+                xml_cleared = base64.b64decode(base64_xml).decode("utf-8")
+            else:
+                with open(signed_xmlfile_name, "r", encoding="utf-8") as f:
+                    xml_cleared = f.read()
             file = frappe.get_doc(
                 {
                     "doctype": "File",
