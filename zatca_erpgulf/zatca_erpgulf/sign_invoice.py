@@ -2174,25 +2174,28 @@ def generate_qr(invoice_number):
         
     customer_doc = frappe.get_doc("Customer", sales_invoice_doc.customer)
    
-    tlv_data = generate_tlv_xml(company_abbr, source_doc)
+    xml_data = None
+    if getattr(sales_invoice_doc, "custom_ksa_einvoicing_xml", None):
+        try:
+            with open(frappe.get_site_path(sales_invoice_doc.custom_ksa_einvoicing_xml.lstrip("/")), "r", encoding="utf-8") as f:
+                xml_data = f.read()
+        except Exception:
+            pass
+    if not xml_data:
+        try:
+            with open(f"{frappe.local.site}/private/files/finalzatcaxml_{invoice_number}.xml", "r", encoding="utf-8") as f:
+                xml_data = f.read()
+        except Exception:
+            pass
 
-    # Convert TLV → bytes
-    
-    tagsbufsarray = []
-    for tag_num, tag_value in tlv_data.items():
-        tagsbufsarray.append(get_tlv_for_value(tag_num, tag_value))
-
-    qrcodebuf = b"".join(tagsbufsarray)
-
-    # Convert to Base64 QR
-    
-    qrcodeb64 = base64.b64encode(qrcodebuf).decode("utf-8")
-    print("qrcodeb64:---->", qrcodeb64)  
-    
-    update_qr_toxml(qrcodeb64, company_abbr)    
-    
-   
-    attach_qr_image__(qrcodeb64, sales_invoice_doc)
+    if xml_data:
+        tlv_data = generate_tlv_xml(xml_data, company_abbr, source_doc)
+        tagsbufsarray = [get_tlv_for_value(tag_num, tag_value) for tag_num, tag_value in tlv_data.items()]
+        qrcodebuf = b"".join(tagsbufsarray)
+        qrcodeb64 = base64.b64encode(qrcodebuf).decode("utf-8")
+        print("qrcodeb64:---->", qrcodeb64)
+        update_qr_toxml(xml_data, qrcodeb64, company_abbr)
+        attach_qr_image__(qrcodeb64, sales_invoice_doc)
 
 
 def attach_qr_image__(qrcodeb64, sales_invoice_doc):
@@ -2306,16 +2309,7 @@ def zatca_call_new(
             invoice = item_data(invoice, sales_invoice_doc)
         else:
             invoice = item_data_with_template(invoice, sales_invoice_doc)
-        xml_structuring(invoice)
-        try:
-            with open(
-                frappe.local.site + "/private/files/finalzatcaxml.xml",
-                "r",
-                encoding="utf-8",
-            ) as file:
-                file_content = file.read()
-        except FileNotFoundError:
-            frappe.throw("XML file not found")
+        file_content = xml_structuring(invoice)
         tag_removed_xml = removetags(file_content)
         canonicalized_xml = canonicalize_xml(tag_removed_xml)
         hash1, encoded_hash = getinvoicehash(canonicalized_xml)
@@ -2324,11 +2318,14 @@ def zatca_call_new(
             company_abbr, source_doc
         )
         encoded_certificate_hash = certificate_hash(company_abbr, source_doc)
-        namespaces, signing_time = signxml_modify(company_abbr, source_doc)
+        modified_xml_string, namespaces, signing_time = signxml_modify(
+            company_abbr, file_content, source_doc
+        )
         signed_properties_base64 = generate_signed_properties_hash(
             signing_time, issuer_name, serial_number, encoded_certificate_hash
         )
-        populate_the_ubl_extensions_output(
+        final_xml_string = populate_the_ubl_extensions_output(
+            modified_xml_string,
             encoded_signature,
             namespaces,
             signed_properties_base64,
@@ -2336,14 +2333,14 @@ def zatca_call_new(
             company_abbr,
             source_doc,
         )
-        tlv_data = generate_tlv_xml(company_abbr, source_doc)
+        tlv_data = generate_tlv_xml(final_xml_string, company_abbr, source_doc)
         tagsbufsarray = []
         for tag_num, tag_value in tlv_data.items():
             tagsbufsarray.append(get_tlv_for_value(tag_num, tag_value))
         qrcodebuf = b"".join(tagsbufsarray)
         qrcodeb64 = base64.b64encode(qrcodebuf).decode("utf-8")
-        update_qr_toxml(qrcodeb64, company_abbr)
-        signed_xmlfile_name = structuring_signedxml()
+        updated_xml_string = update_qr_toxml(final_xml_string, qrcodeb64, company_abbr)
+        signed_xmlfile_name = structuring_signedxml(invoice_number, updated_xml_string)
         # Example usage
         # file_path = generate_invoice_pdf(
         #     invoice_number, l anguage="en", letterhead="Sample letterhead"

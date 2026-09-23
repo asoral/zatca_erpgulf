@@ -711,30 +711,23 @@ def zatca_call(
             invoice = item_data(invoice, purchase_invoice_doc)
         else:
             invoice = item_data_with_template(invoice, purchase_invoice_doc)
-        xml_structuring(invoice)
-        try:
-            with open(
-                frappe.local.site + "/private/files/finalzatcaxml.xml",
-                "r",
-                encoding="utf-8",
-            ) as file:
-                file_content = file.read()
-        except FileNotFoundError:
-            frappe.throw("XML file not found")
+        file_content = xml_structuring(invoice)
         tag_removed_xml = removetags(file_content)
         canonicalized_xml = canonicalize_xml(tag_removed_xml)
         hash1, encoded_hash = getinvoicehash(canonicalized_xml)
-        print("-------------------------------$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$>",source_doc)
         encoded_signature = digital_signature(hash1, company_abbr, source_doc)
         issuer_name, serial_number = extract_certificate_details(
             company_abbr, source_doc
         )
         encoded_certificate_hash = certificate_hash(company_abbr, source_doc)
-        namespaces, signing_time = signxml_modify(company_abbr, source_doc)
+        modified_xml_string, namespaces, signing_time = signxml_modify(
+            company_abbr, file_content, source_doc
+        )
         signed_properties_base64 = generate_signed_properties_hash(
             signing_time, issuer_name, serial_number, encoded_certificate_hash
         )
-        populate_the_ubl_extensions_output(
+        final_xml_string = populate_the_ubl_extensions_output(
+            modified_xml_string,
             encoded_signature,
             namespaces,
             signed_properties_base64,
@@ -742,7 +735,7 @@ def zatca_call(
             company_abbr,
             source_doc,
         )
-        tlv_data = generate_tlv_xml(company_abbr, source_doc)
+        tlv_data = generate_tlv_xml(final_xml_string, company_abbr, source_doc)
 
         tagsbufsarray = []
         for tag_num, tag_value in tlv_data.items():
@@ -750,8 +743,8 @@ def zatca_call(
 
         qrcodebuf = b"".join(tagsbufsarray)
         qrcodeb64 = base64.b64encode(qrcodebuf).decode("utf-8")
-        update_qr_toxml(qrcodeb64, company_abbr)
-        signed_xmlfile_name = structuring_signedxml()
+        updated_xml_string = update_qr_toxml(final_xml_string, qrcodeb64, company_abbr)
+        signed_xmlfile_name = structuring_signedxml(invoice_number, updated_xml_string)
         # Example usage
         # file_path = generate_invoice_pdf(
         #     invoice_number, l anguage="en", letterhead="Sample letterhead"
