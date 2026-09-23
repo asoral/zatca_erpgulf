@@ -440,7 +440,10 @@ def reporting_api_sales_withoutxml(
                 linked_doc = frappe.get_doc("Company", zatca_settings.custom_linked_doctype)
                 production_csid = linked_doc.custom_basic_auth_from_production
         else:
-            production_csid = company_doc.custom_basic_auth_from_production
+            if company_doc.custom_select == "Sandbox":
+                production_csid = company_doc.custom_basic_auth_from_csid or company_doc.custom_basic_auth_from_production
+            else:
+                production_csid = company_doc.custom_basic_auth_from_production
 
         if not production_csid:
             frappe.throw(
@@ -790,7 +793,10 @@ def reporting_api_purchase_withoutxml(
             )
             production_csid = zatca_settings.custom_final_auth_csid
         else:
-            production_csid = company_doc.custom_basic_auth_from_production
+            if company_doc.custom_select == "Sandbox":
+                production_csid = company_doc.custom_basic_auth_from_csid or company_doc.custom_basic_auth_from_production
+            else:
+                production_csid = company_doc.custom_basic_auth_from_production
 
         if not production_csid:
             frappe.throw(

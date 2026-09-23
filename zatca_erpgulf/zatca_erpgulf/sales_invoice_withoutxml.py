@@ -301,7 +301,10 @@ def reporting_api_sales_withoutxml(
                 linked_doc = frappe.get_doc("Company", zatca_settings.custom_linked_doctype)
                 production_csid = linked_doc.custom_basic_auth_from_production
         else:
-            production_csid = company_doc.custom_basic_auth_from_production
+            if company_doc.custom_select == "Sandbox":
+                production_csid = company_doc.custom_basic_auth_from_csid or company_doc.custom_basic_auth_from_production
+            else:
+                production_csid = company_doc.custom_basic_auth_from_production
         if not production_csid:
             frappe.throw(
                 _(f"Production CSID is missing in ZATCA settings for {company_abbr}or multiple setting page")

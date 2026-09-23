@@ -102,8 +102,11 @@ def get_api_url(company_abbr, base_url):
         company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
         if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
             company_abbr = frappe.db.get_value('Company', company_doc.parent_company, 'abbr')
+            company_doc = frappe.get_doc("Company", {"abbr": company_abbr})
 
         if company_doc.custom_select == "Sandbox":
+            if base_url in ("invoices/reporting/single", "invoices/clearance/single"):
+                base_url = "compliance/invoices"
             url = company_doc.custom_sandbox_url + base_url
         elif company_doc.custom_select == "Simulation":
             url = company_doc.custom_simulation_url + base_url
@@ -255,7 +258,10 @@ def reporting_api(
                 linked_doc = frappe.get_doc("Company", zatca_settings.custom_linked_doctype)
                 production_csid = linked_doc.custom_basic_auth_from_production
         else:
-            production_csid = company_doc.custom_basic_auth_from_production
+            if company_doc.custom_select == "Sandbox":
+                production_csid = company_doc.custom_basic_auth_from_csid or company_doc.custom_basic_auth_from_production
+            else:
+                production_csid = company_doc.custom_basic_auth_from_production
         if production_csid:
             headers = {
                 "accept": "application/json",
@@ -591,7 +597,10 @@ def clearance_api(
                 linked_doc = frappe.get_doc("Company", zatca_settings.custom_linked_doctype)
                 production_csid = linked_doc.custom_basic_auth_from_production or ""
         else:
-            production_csid = company_doc.custom_basic_auth_from_production or ""
+            if company_doc.custom_select == "Sandbox":
+                production_csid = company_doc.custom_basic_auth_from_csid or company_doc.custom_basic_auth_from_production or ""
+            else:
+                production_csid = company_doc.custom_basic_auth_from_production or ""
         payload = {
             "invoiceHash": encoded_hash,
             "uuid": uuid1,
@@ -904,6 +913,7 @@ def zatca_call(
             frappe.throw(_("Invoice Number is NOT Valid: " + str(invoice_number)))
         invoice = xml_tags()
         invoice, uuid1, sales_invoice_doc = salesinvoice_data(invoice, invoice_number)
+        source_doc = source_doc or sales_invoice_doc
         # Get the company abbreviation
         company_abbr = frappe.db.get_value(
             "Company", {"name": sales_invoice_doc.company}, "abbr"

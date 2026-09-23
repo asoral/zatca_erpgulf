@@ -33,6 +33,8 @@ def get_api_url(company_abbr, base_url):
             company_doc = frappe.get_doc("Company",company_doc.parent_company)
         
         if company_doc.custom_select == "Sandbox":
+            if base_url in ("invoices/reporting/single", "invoices/clearance/single"):
+                base_url = "compliance/invoices"
             url = company_doc.custom_sandbox_url + base_url
         elif company_doc.custom_select == "Simulation":
             url = company_doc.custom_simulation_url + base_url
@@ -161,7 +163,10 @@ def reporting_api_xml_sales_invoice(
                 linked_doc = frappe.get_doc("Company", zatca_settings.custom_linked_doctype)
                 production_csid = linked_doc.custom_basic_auth_from_production
         else:
-            production_csid = company_doc.custom_basic_auth_from_production
+            if company_doc.custom_select == "Sandbox":
+                production_csid = company_doc.custom_basic_auth_from_csid or company_doc.custom_basic_auth_from_production
+            else:
+                production_csid = company_doc.custom_basic_auth_from_production
         if not production_csid:
             frappe.throw(
                 _(
