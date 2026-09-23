@@ -73,34 +73,65 @@ frappe.realtime.on('hide_gif', () => {
     $('#custom-gif-overlay').remove();
 });
 
+// frappe.ui.form.on("Sales Invoice", {
+//     refresh: function (frm) {
+//         if (frm.doc.docstatus === 1 && !["CLEARED", "REPORTED"].includes(frm.doc.custom_zatca_status)) {
+//             frm.add_custom_button(__("Send invoice to ZATCA"), function () {
+//                 frm.call({
+//                     method: "zatca_erpgulf.zatca_erpgulf.sign_invoice.zatca_background",
+//                     args: {
+//                         "invoice_number": frm.doc.name,
+//                         "source_doc": frm.doc
+
+//                     },
+//                     callback: function (r) {
+
+//                         console.log("response.message");
+//                         frm.reload_doc();
+
+//                     }
+
+
+//                 });
+//             }, __("ZATCA Phase-2"));
+//         }
+
 frappe.ui.form.on("Sales Invoice", {
-    refresh: function (frm) {        
+    refresh: function (frm) {
         update_field_visibility(frm);
 
-        if (frm.doc.docstatus === 1 && !["CLEARED", "REPORTED"].includes(frm.doc.custom_zatca_status)) {
-            frappe.db.get_value("Company", frm.doc.company, "country").then((r)=>{
-                if(r.message && r.message.country === "Saudi Arabia"){
-
-                    frm.add_custom_button(__("Send invoice to Zatca"), function () {
-                        frm.call({
-                            method: "zatca_erpgulf.zatca_erpgulf.sign_invoice.zatca_background",
-                            args: {
-                                "invoice_number": frm.doc.name,
-                                "source_doc": frm.doc
-
+        if (frm.doc.company) {
+            frappe.db.get_value("Company", frm.doc.company, ["country", "custom_phase_1_or_2"]).then((r) => {
+                if (r.message && r.message.country === "Saudi Arabia") {
+                    let phase = r.message.custom_phase_1_or_2;
+                    if (
+                        frm.doc.docstatus === 1 &&
+                        !["CLEARED", "REPORTED"].includes(frm.doc.custom_zatca_status) &&
+                        phase !== "Phase-1"
+                    ) {
+                        frm.add_custom_button(
+                            __("Send invoice to ZATCA"),
+                            function () {
+                                frm.call({
+                                    method: "zatca_erpgulf.zatca_erpgulf.sign_invoice.zatca_background",
+                                    args: {
+                                        invoice_number: frm.doc.name,
+                                        source_doc: frm.doc
+                                    },
+                                    callback: function (r) {
+                                        console.log(r.message);
+                                        frm.reload_doc();
+                                    }
+                                });
                             },
-                            callback: function (r) {
-
-                                console.log("response.message");
-                                frm.reload_doc();
-
-                            }
-                        })
-                    }, __("Zatca Phase-2"));
-
+                            __("ZATCA Phase-2")
+                        );
+                    }
                 }
-            })
+            });
         }
+
+
         frm.page.add_menu_item(__('Print PDF-A3'), function () {
             // Create a dialog box with fields for Print Format, Letterhead, and Language
             const dialog = new frappe.ui.Dialog({
@@ -285,6 +316,15 @@ frappe.ui.form.on('Sales Invoice', {
                     "https://docs.claudion.com/Claudion-Docs/selfbilled",
                 ],
             },
+            {
+                fieldname: "custom_zatca_pmm",
+                text: `
+                    The invoice is submitted normally in ERPNext but is not transmitted to ZATCA, allowing businesses that trade in eligible second-hand goods to manage PMM transactions separately and comply with ZATCA's Profit Margin Method VAT regulations.
+                `,
+                links: [
+                    "https://docs.claudion.com/Claudion-Docs/PMM",
+                ],
+            },
         ];
         applyTooltips(frm, fieldsWithTooltips);
         const css = `
@@ -333,6 +373,224 @@ frappe.ui.form.on('Sales Invoice', {
 
         // Attach popovers to specific fields
 
+    }
+});
+frappe.ui.form.on('Sales Invoice', {
+    refresh(frm) {
+        const response = frm.doc.custom_zatca_full_response;
+        if (!response) return;
+
+        try {
+            let jsonText = null;
+
+            // Try extract after 'ZATCA Response:'
+            const anchor = 'ZATCA Response:';
+            if (response.includes(anchor)) {
+                const afterAnchor = response.split(anchor)[1];
+                const firstBrace = afterAnchor.indexOf('{');
+                const lastBrace = afterAnchor.lastIndexOf('}');
+                if (firstBrace !== -1 && lastBrace !== -1) {
+                    jsonText = afterAnchor.slice(firstBrace, lastBrace + 1).trim();
+                }
+            }
+
+            // Fallback: first JSON block in the entire response
+            if (!jsonText && response.includes('{')) {
+                const firstBrace = response.indexOf('{');
+                const lastBrace = response.lastIndexOf('}');
+                jsonText = response.slice(firstBrace, lastBrace + 1).trim();
+            }
+
+            if (!jsonText) {
+                console.warn("⚠️ No JSON detected in ZATCA response");
+                return;
+            }
+
+            // Safely parse JSON
+            const zatca = JSON.parse(jsonText);
+            const vr = zatca?.validationResults;
+
+            // Extract errors & warnings
+            let errors = Array.isArray(vr?.errorMessages) ? vr.errorMessages : [];
+            const warnings = Array.isArray(vr?.warningMessages) ? vr.warningMessages : [];
+
+            // 🔴 Special condition → ignore Duplicate-Invoice error
+            errors = errors.filter(e => !(e.code === "Invoice-Errors" && e.category === "Duplicate-Invoice"));
+
+            // If no valid errors/warnings remain, stop
+            if (!errors.length && !warnings.length) return;
+
+            let combined_html = "";
+
+            if (errors.length) {
+                combined_html += `<div style="color:#b71c1c; font-weight:bold;">Errors:</div>`;
+                combined_html += `<div style="color:#b71c1c;">` + errors.map(e =>
+                    `<div style="margin-left:10px;"><b>${e.code}</b>: ${e.message}</div>`
+                ).join('') + `</div>`;
+            }
+
+            if (warnings.length) {
+                combined_html += `<div style="color:#ef6c00; font-weight:bold; margin-top:10px;">Warnings:</div>`;
+                combined_html += `<div style="color:#ef6c00;">` + warnings.map(w =>
+                    `<div style="margin-left:10px;"><b>${w.code}</b>: ${w.message}</div>`
+                ).join('') + `</div>`;
+            }
+
+            // Show orange if only warnings, red if errors exist
+            const alertColor = errors.length ? 'red' : 'orange';
+
+            frm.dashboard.clear_headline();
+            frm.dashboard.set_headline_alert(combined_html, alertColor);
+
+        } catch (e) {
+            console.warn("❌ ZATCA JSON parse failed", e);
+        }
+    }
+});
+
+
+// frappe.ui.form.on('Sales Invoice', {
+//     refresh(frm) {
+//         const response = frm.doc.custom_zatca_full_response;
+//         if (!response) return;
+
+//         try {
+//             let jsonText = null;
+
+//             // Try extract after 'ZATCA Response:'
+//             const anchor = 'ZATCA Response:';
+//             if (response.includes(anchor)) {
+//                 const afterAnchor = response.split(anchor)[1];
+//                 const firstBrace = afterAnchor.indexOf('{');
+//                 const lastBrace = afterAnchor.lastIndexOf('}');
+//                 if (firstBrace !== -1 && lastBrace !== -1) {
+//                     jsonText = afterAnchor.slice(firstBrace, lastBrace + 1).trim();
+//                 }
+//             }
+
+//             // Fallback: first JSON block in the entire response
+//             if (!jsonText && response.includes('{')) {
+//                 const firstBrace = response.indexOf('{');
+//                 const lastBrace = response.lastIndexOf('}');
+//                 jsonText = response.slice(firstBrace, lastBrace + 1).trim();
+//             }
+
+//             if (!jsonText) {
+//                 console.warn("⚠️ No JSON detected in ZATCA response");
+//                 return;
+//             }
+
+//             // Safely parse JSON
+//             const zatca = JSON.parse(jsonText);
+//             const vr = zatca?.validationResults;
+
+//             const errors = Array.isArray(vr?.errorMessages) ? vr.errorMessages : [];
+//             const warnings = Array.isArray(vr?.warningMessages) ? vr.warningMessages : [];
+
+//             if (!errors.length && !warnings.length) return;
+
+//             let combined_html = "";
+
+//             if (errors.length) {
+//                 combined_html += `<div style="color:#b71c1c; font-weight:bold;">Errors:</div>`;
+//                 combined_html += `<div style="color:#b71c1c;">` + errors.map(e =>
+//                     `<div style="margin-left:10px;"><b>${e.code}</b>: ${e.message}</div>`
+//                 ).join('') + `</div>`;
+//             }
+
+//             if (warnings.length) {
+//                 combined_html += `<div style="color:#ef6c00; font-weight:bold; margin-top:10px;">Warnings:</div>`;
+//                 combined_html += `<div style="color:#ef6c00;">` + warnings.map(w =>
+//                     `<div style="margin-left:10px;"><b>${w.code}</b>: ${w.message}</div>`
+//                 ).join('') + `</div>`;
+//             }
+
+//             // Show orange if no errors, red if errors exist
+//             const alertColor = errors.length ? 'red' : 'orange';
+
+//             frm.dashboard.clear_headline();
+//             frm.dashboard.set_headline_alert(combined_html, alertColor);
+
+//         } catch (e) {
+//             console.warn("❌ ZATCA JSON parse failed", e);
+//         }
+//     }
+// });
+
+
+frappe.ui.form.on('Sales Invoice', {
+    refresh: function (frm) {
+        if (!frm.is_new()) {
+            // Add menu item like Print PDF-A3
+            frm.page.add_menu_item(__('Create XML for Debug'), function () {
+                frappe.call({
+                    method: "zatca_erpgulf.zatca_erpgulf.debug_xml.debug_call",
+                    args: {
+                        invoice_number: frm.doc.name
+                    },
+                    freeze: true,
+                    freeze_message: __("Generating Debug XML..."),
+                    callback: function (r) {
+                        if (r.message && r.message.status === "success") {
+                            frappe.msgprint(__('✅ Debug XML attached successfully!'));
+                            frm.reload_doc();
+                        }
+                    }
+                });
+            });
+        }
+    }
+});
+
+frappe.ui.form.on("Sales Invoice", {
+    refresh(frm) {
+        toggle_return_against_field(frm);
+    },
+
+    company(frm) {
+        toggle_return_against_field(frm);
+    },
+
+    is_return(frm) {
+        toggle_return_against_field(frm);
+    }
+});
+
+function toggle_return_against_field(frm) {
+    if (!frm.doc.company) {
+        frm.set_df_property("custom_return_against_for_zatca", "hidden", 1);
+        return;
+    }
+
+    frappe.db.get_value(
+        "Company",
+        frm.doc.company,
+        "custom_allow_creditnote_without_original_invoice_in_the_system"
+    ).then((r) => {
+        const show_field =
+            frm.doc.is_return == 1 &&
+            cint(r.message.custom_allow_creditnote_without_original_invoice_in_the_system) == 1;
+
+        frm.set_df_property(
+            "custom_return_against_for_zatca",
+            "hidden",
+            !show_field
+        );
+    });
+}
+
+frappe.ui.form.on('Sales Invoice', {
+    refresh(frm) {
+        frm.fields_dict.custom_zatca_pmm_warning.$wrapper.html(`
+            <div style="
+                background:#fff3cd;
+                border:1px solid #ffeeba;
+                padding:10px;
+                border-radius:4px;
+                margin-top:5px;">
+                ⚠️ <b>Important:</b> Please consult your auditor or ZATCA account manager before selecting invoice type, to ensure you are fully legally compliant and eligible to use it.
+            </div>
+        `);
     }
 });
 

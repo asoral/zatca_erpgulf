@@ -68,20 +68,20 @@ def submit_posinvoices_to_zatca_background_process():
             pass
             return
 
-        past_24_hours_time = add_to_date(now_datetime(), hours=-24)
+        past_retry_time = add_to_date(now_datetime(), days=-30)
 
         not_submitted_invoices = frappe.get_all(
             "POS Invoice",
             filters=[
-                ["creation", ">=", past_24_hours_time],
+                ["creation", ">=", past_retry_time],
                 ["docstatus", "in", [0, 1]],
                 [
                     "custom_zatca_status",
                     "in",
-                    ["Not Submitted", "503 Service Unavailable"],
+["Not Submitted", "503 Service Unavailable"],
                 ],
             ],
-            fields=["name", "docstatus", "company"],
+            fields=["name", "docstatus", "company", "customer"],
         )
 
         if not not_submitted_invoices:
@@ -98,24 +98,23 @@ def submit_posinvoices_to_zatca_background_process():
             if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
                 company_doc = frappe.get_doc("Company",company_doc.parent_company)
             # print(f"Processing {pos_invoice_doc.name}", "ZATCA Background Job")
+            if company_doc.custom_phase_1_or_2 == "Phase-1":
+                # frappe.log_error(f"Skipping invoice {invoice['name']} because company is Phase-1", "ZATCA Background Debug")
+                continue
             if pos_invoice_doc.docstatus == 1:
                 zatca_background_on_submit(
                     pos_invoice_doc, bypass_background_check=True
                 )
-                frappe.log_error(
-                    f"Processed {pos_invoice_doc.name}: Sent to ZATCA.",
-                    "ZATCA Background Job",
-                )
-            elif company_doc.custom_submit_or_not == 1:
-                pos_invoice_doc.submit()
-
-                zatca_background_on_submit(
-                    pos_invoice_doc, bypass_background_check=True
-                )
-                frappe.log_error(
-                    f"Submitted {pos_invoice_doc.name} before sending to ZATCA.",
-                    "ZATCA Background Job",
-                )
+            else:
+                customer_doc = frappe.get_doc("Customer", pos_invoice_doc.customer)
+                if (
+                    company_doc.custom_submit_or_not == 1
+                    and customer_doc.custom_b2c == 1
+                ):
+                    pos_invoice_doc.submit()
+                    zatca_background_on_submit(
+                        pos_invoice_doc, bypass_background_check=True
+                    )
 
         # frappe.log_error(
         #     f"Processed {len(not_submitted_invoices)} invoices for ZATCA submission.",

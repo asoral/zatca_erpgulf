@@ -1,8 +1,14 @@
 """this module contains functions that are used to validate tax information
 in sales invoices."""
 
-from erpnext import get_region
+from frappe import _
 import frappe
+
+try:
+    from erpnext import get_region
+except ImportError:
+    def get_region(company_name):
+        return frappe.db.get_value("Company", company_name, "country")
 
 
 def validate_sales_invoice_taxes(doc, event=None):
@@ -13,41 +19,119 @@ def validate_sales_invoice_taxes(doc, event=None):
     :param sales_invoice_doc: The sales invoice document object
     :return: None
     """
-    customer_doc = frappe.get_doc("Customer", doc.customer)
-    # if customer_doc.custom_b2c != 1:
-    #     frappe.throw("This customer should be B2C for Background")
     company_doc = frappe.get_doc("Company", doc.company)
+
+    # Exit early if ZATCA is not enabled
+    is_zatca_enabled = company_doc.custom_zatca_invoice_enabled
+    if not is_zatca_enabled and not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
+        is_zatca_enabled = frappe.db.get_value("Company", company_doc.parent_company, "custom_zatca_invoice_enabled")
+
+    if not is_zatca_enabled:
+        return
+    if doc.doctype == "Sales Invoice" and doc.custom_zatca_pmm == 1:
+        return
+    is_gpos_installed = "gpos" in frappe.get_installed_apps()
+    field_exists = frappe.get_meta(doc.doctype).has_field("custom_unique_id")
+
+    if is_gpos_installed and field_exists:
+        if doc.custom_unique_id and not doc.custom_zatca_pos_name:
+            frappe.throw(_(
+                "ZATCA POS Machine name is missing for invoice, Add ZATCA POS machine name"
+            ))
+    customer_doc = frappe.get_doc("Customer", doc.customer)
+
+    parent_company_doc = company_doc
     if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-        company_doc = frappe.get_doc("Company",company_doc.parent_company)
-    if customer_doc.custom_b2c != 1 and company_doc.custom_send_invoice_to_zatca == "Background" :
-        frappe.throw("This customer should be B2C for Background")
-    
+        parent_company_doc = frappe.get_doc("Company", company_doc.parent_company)
+
+    if customer_doc.custom_b2c != 1 and (
+        company_doc.custom_send_invoice_to_zatca == "Background"
+        or parent_company_doc.custom_send_invoice_to_zatca == "Background"
+    ):
+        frappe.throw(_("This customer should be B2C for Background"))
+
     region = get_region(company_doc.name)
     if region not in ["Saudi Arabia"]:
         return
 
     # If the company requires cost centers, ensure the invoice has one
+    if doc.custom_zatca_pos_name:
+        zatca_settings = frappe.get_doc("ZATCA Multiple Setting", doc.custom_zatca_pos_name)
+
+        # Get the linked Company from custom_linked_doctype
+        linked_company_doc = frappe.get_doc("Company", zatca_settings.custom_linked_doctype)
+
+        # Validation: doc.company and linked company must be the same
+        if linked_company_doc.name != doc.company:
+            frappe.throw(_(
+                f"Company mismatch: Document company '{doc.company}' "
+                f"does not match linked ZATCA company '{linked_company_doc.name} of machine setting'."
+            ))
+
     if company_doc.custom_costcenter == 1:
-        # if not doc.cost_center:
-        #     frappe.throw("This company requires a Cost Center")
-
-        cost_center_doc = frappe.get_doc("Company", company_doc.name)
-
-        # Ensure the Cost Center has a valid custom_zatca_branch_address
-        if not cost_center_doc.custom_zatca_branch_address:
-            frappe.throw(
-                f"The Company '{doc.company}' is missing a valid branch address. "
-                "Please update the Company with a valid `custom_zatca_branch_address`."
+        if doc.cost_center and frappe.db.exists("Cost Center", doc.cost_center):
+            cost_center_doc = frappe.get_doc("Cost Center", doc.cost_center)
+            if getattr(cost_center_doc, "custom_zatca_branch_address", None):
+                if not getattr(cost_center_doc, "custom_registration_type", None):
+                    frappe.throw(
+                        _(
+                            f"As per ZATCA regulation, The Cost Center '{doc.cost_center}' is missing a valid registration_type. "
+                            "Please update the Cost Center with a valid `custom_registration_type`."
+                        )
+                    )
+                if not getattr(cost_center_doc, "custom_company_registration", None):
+                    frappe.throw(
+                        _(
+                            f"As per ZATCA regulation, The Cost Center '{doc.cost_center}' is missing a valid company registration. "
+                            "Please update the Cost Center with a valid `custom_company_registration`."
+                        )
+                    )
+        else:
+            has_address = frappe.db.get_value(
+                "Dynamic Link",
+                {"link_doctype": "Company", "link_name": company_doc.name, "parenttype": "Address"},
+                "parent",
             )
-        if not cost_center_doc.custom_registration_type:
+            if not has_address and company_doc.parent_company:
+                has_address = frappe.db.get_value(
+                    "Dynamic Link",
+                    {"link_doctype": "Company", "link_name": company_doc.parent_company, "parenttype": "Address"},
+                    "parent",
+                )
+            if not has_address:
+                frappe.throw(
+                    _(
+                        f"The Company '{doc.company}' is missing a valid address. "
+                        "Please update the Company with a valid address."
+                    )
+                )
+            if not company_doc.custom_registration_type:
+                frappe.throw(
+                    _(
+                        f"The Company '{doc.company}' is missing a valid registration_type. "
+                        "Please update the Company with a valid `custom_registration_type`."
+                    )
+                )
+            if not company_doc.custom_company_registration:
+                frappe.throw(
+                    _(
+                        f"The Company '{doc.company}' is missing a valid company registration. "
+                        "Please update the Company with a valid `custom_company_registration`."
+                    )
+                )
+
+    # Validate invoice-level exemption reason when no Item Tax Template is used
+    if not any(item.item_tax_template for item in doc.items):
+        if (
+            getattr(doc, "custom_exemption_reason_code", None)
+            == "VATEX-SA-OOS"
+            and not getattr(doc, "custom_tax_exemption_reason", None)
+        ):
             frappe.throw(
-                f"The Company '{doc.company}' is missing a valid registration_type "
-                "Please update the Company with a valid `custom_registration_type`."
-            )
-        if not cost_center_doc.custom_company_registration:
-            frappe.throw(
-                f"The Company '{doc.company}' is missing a valid registration_type "
-                "Please update the Company with a valid `custom_company_registration`."
+                _(
+                    "Tax Exemption Reason is mandatory when the "
+                    "Exemption Reason Code is VATEX-SA-OOS."
+                )
             )
 
     for item in doc.items:
@@ -55,17 +139,66 @@ def validate_sales_invoice_taxes(doc, event=None):
         if item.item_tax_template:
             try:
                 # Ensure the Item Tax Template exists
-                frappe.get_doc("Item Tax Template", item.item_tax_template)
+                item_tax_template = frappe.get_doc("Item Tax Template", item.item_tax_template)
+                if (
+                    item_tax_template.custom_exemption_reason_code
+                    == "VATEX-SA-OOS"
+                    and not item_tax_template.custom_tax_exemption_reason
+                ):
+                    frappe.throw(
+                        _(
+                            "Tax Exemption Reason is mandatory in Item Tax Template "
+                            f"'{item.item_tax_template}' when the Exemption Reason "
+                            "Code is VATEX-SA-OOS."
+                        )
+                    )
                 continue
             except frappe.DoesNotExistError:
                 frappe.throw(
-                    f"The Item Tax Template '{item.item_tax_template}' "
-                    "for item '{item.item_code}' does not exist."
+                    _(
+                        f"As per ZATCA regulation, The Item Tax Template '{item.item_tax_template}' "
+                        "for item '{item.item_code}' does not exist."
+                    )
                 )
 
         if not doc.taxes or len(doc.taxes) == 0:
             frappe.throw(
-                "Tax information is missing from the Sales Invoice."
-                " Either add an Item Tax Template for all items "
-                "or include taxes in the invoice."
+                _(
+                    "As per ZATCA regulation,Tax information is missing from the Sales Invoice."
+                    " Either add an Item Tax Template for all items "
+                    "or include taxes in the invoice."
+                )
             )
+    if doc.is_return == 1 and doc.doctype in ["Sales Invoice", "POS Invoice"]:
+        custom_return_against = getattr(
+            doc, "custom_return_against_for_zatca", None
+        )
+
+        if not doc.return_against and not custom_return_against:
+            frappe.throw(
+                _(
+                    "As per ZATCA regulation, the Billing Reference ID "
+                    "(Original Invoice Number) is mandatory for "
+                    "Credit Notes and Return Invoices. "
+                    "Please select the original invoice in the 'Return Against' field."
+                )
+            )
+    if doc.doctype == "Sales Invoice":
+        if doc.is_debit_note == 1 and not doc.return_against:
+            frappe.throw(
+                _("Debit Note must reference a Sales Invoice in 'Return Against'.")
+            )
+    if doc.doctype == "Sales Invoice":
+        if "claudion4saudi" in frappe.get_installed_apps():
+            if hasattr(doc, "custom_advances_copy") and doc.custom_advances_copy:
+                for advance_row in doc.custom_advances_copy:
+                    if (
+                        advance_row.difference_posting_date
+                        and not advance_row.reference_name
+                    ):
+                        frappe.throw(
+                            _(
+                                "⚠️As per ZATCA regulation, Missing Advance Sales Invoice referncename in feting details ."
+                                "If there is no advance sales invoice,then remove the row from the table"
+                            )
+                        )
