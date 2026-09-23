@@ -36,10 +36,16 @@ def encode_customoid(custom_string):
 def parse_csr_config(csr_config_string):
     """Parse the csr config data"""
     csr_config = {}
+    if not csr_config_string:
+        return csr_config
     lines = csr_config_string.splitlines()
     for line in lines:
-        key, value = line.split("=", 1)
-        csr_config[key.strip()] = value.strip()
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith(";"):
+            continue
+        if "=" in line:
+            key, value = line.split("=", 1)
+            csr_config[key.strip()] = value.strip()
     return csr_config
 
 
@@ -86,8 +92,7 @@ def get_csr_data(company_abbr):
 
         company_doc = frappe.get_doc("Company", company_name)
         if not company_doc.is_group and company_doc.parent_company and company_doc.custom_costcenter:
-            # company_doc = frappe.get_doc("Company",company_doc.parent_company)
-            company_name = frappe.db.get_value("Company",company_doc.parent_company, 'name')
+            company_doc = frappe.get_doc("Company", company_doc.parent_company)
 
         csr_config_string = company_doc.custom_csr_config
 
@@ -295,9 +300,9 @@ def create_csr(zatca_doc, portal_type, company_abbr):
             company_doc.save(ignore_permissions=True)
         return encoded_string
     except (ValueError, KeyError, TypeError, frappe.ValidationError) as e:
-        frappe.throw(
-            "error occurred while creating csr for company {company_abbr} " + str(e)
-        )
+        error_msg = "error occurred while creating csr for company {0} ".format(company_abbr)
+        frappe.log_error(error_msg, frappe.get_traceback())
+        frappe.throw(error_msg)
         return None
 
 
@@ -1240,14 +1245,14 @@ def compliance_api_call(
             data=payload,
             timeout=300,
         )
-        # frappe.throw(response.status_code)
-        frappe.throw(response.text)
-        if response.status_code != 200:
+        if response.status_code == 200:
+            frappe.msgprint(f"ZATCA Compliance successful:<br>{response.text}", indicator="green")
+            return response.text
+        elif response.status_code == 202:
+            frappe.msgprint(f"ZATCA Compliance returned warnings:<br>{response.text}", indicator="orange")
+            return response.text
+        else:
             frappe.throw(f"Error in compliance: {response.text}")
-        if response.status_code != 202:
-            frappe.throw(f"Warning from zatca in compliance: {response.text}")
-
-        return response.text
     except requests.exceptions.RequestException as e:
         frappe.msgprint(f"Request exception occurred: {str(e)}")
         return "error in compliance", "NOT ACCEPTED"

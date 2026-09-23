@@ -684,29 +684,30 @@ def customer_data(invoice, sales_invoice_doc):
             invoice, "cac:AccountingCustomerParty"
         )
         cac_party_2 = ET.SubElement(cac_accountingcustomerparty, "cac:Party")
-        cac_partyidentification_1 = ET.SubElement(
-            cac_party_2, "cac:PartyIdentification"
-        )
-        cbc_id_4 = ET.SubElement(cac_partyidentification_1, CBC_ID)
-        cbc_id_4.set("schemeID", str(customer_doc.custom_buyer_id_type))
-        cbc_id_4.text = customer_doc.custom_buyer_id
+        if customer_doc.custom_buyer_id and customer_doc.custom_buyer_id_type:
+            cac_partyidentification_1 = ET.SubElement(
+                cac_party_2, "cac:PartyIdentification"
+            )
+            cbc_id_4 = ET.SubElement(cac_partyidentification_1, CBC_ID)
+            cbc_id_4.set("schemeID", str(customer_doc.custom_buyer_id_type))
+            cbc_id_4.text = customer_doc.custom_buyer_id
         country_dict = country_code_mapping()
         address = None
-        if customer_doc.custom_b2c != 1:
-            if int(frappe.__version__.split(".", maxsplit=1)[0]) == 13:
-                if sales_invoice_doc.customer_address:
-                    address = frappe.get_doc(
-                        "Address", sales_invoice_doc.customer_address
-                    )
-            else:
-                if customer_doc.customer_primary_address:
-                    address = frappe.get_doc(
-                        "Address", customer_doc.customer_primary_address
-                    )
+        if sales_invoice_doc.customer_address:
+            address = frappe.get_doc(
+                "Address", sales_invoice_doc.customer_address
+            )
+        elif customer_doc.customer_primary_address:
+            address = frappe.get_doc(
+                "Address", customer_doc.customer_primary_address
+            )
 
-            if not address:
-                frappe.throw("Customer address is mandatory for non-B2C customers.")
+        is_b2c = getattr(sales_invoice_doc, "custom_b2c", 0) == 1
 
+        if not is_b2c and not address:
+            frappe.throw("Customer address is mandatory for non-B2C customers.")
+
+        if address:
             cac_postaladdress_1 = ET.SubElement(cac_party_2, "cac:PostalAddress")
             # frappe.throw(address.address_line1)
             if address.address_line1:

@@ -648,10 +648,12 @@ def customer_data(invoice, pos_invoice_doc):
         cbc_id_4.set("schemeID", "CRN")
         cbc_id_4.text = customer_doc.tax_id
         # frappe.throw(f"Customer Tax ID set to: {cbc_ID_4.text}")
-        if int(frappe.__version__.split(".", maxsplit=1)[0]) == 13:
+        if getattr(pos_invoice_doc, "customer_address", None):
             address = frappe.get_doc("Address", pos_invoice_doc.customer_address)
-        else:
+        elif getattr(customer_doc, "customer_primary_address", None):
             address = frappe.get_doc("Address", customer_doc.customer_primary_address)
+        else:
+            address = None
         cac_postaladdress_1 = ET.SubElement(cac_party_2, "cac:PostalAddress")
         cbc_streetname_1 = ET.SubElement(cac_postaladdress_1, "cbc:StreetName")
         cbc_streetname_1.text = address.address_line1

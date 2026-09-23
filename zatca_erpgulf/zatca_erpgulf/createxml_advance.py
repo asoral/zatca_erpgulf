@@ -36,10 +36,16 @@ def encode_customoid(custom_string):
 def parse_csr_config(csr_config_string):
     """Parse the csr config data"""
     csr_config = {}
+    if not csr_config_string:
+        return csr_config
     lines = csr_config_string.splitlines()
     for line in lines:
-        key, value = line.split("=", 1)
-        csr_config[key.strip()] = value.strip()
+        line = line.strip()
+        if not line or line.startswith("#") or line.startswith(";"):
+            continue
+        if "=" in line:
+            key, value = line.split("=", 1)
+            csr_config[key.strip()] = value.strip()
     return csr_config
 
 
