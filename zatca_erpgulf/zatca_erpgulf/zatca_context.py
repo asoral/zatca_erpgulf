@@ -577,7 +577,7 @@ def validate_zatca_invoice_before_submission(sales_invoice_doc):
     Guarantees:
     1. Seller VAT is valid (15 digits, starting and ending with 3).
     2. Stored Certificate is present and valid.
-    3. Stored Private Key is present and cryptographically matches the Certificate.
+    3. Stored Private Key is present.
     4. Certificate validity window is active (not expired).
     5. Certificate VAT matches the Invoice Seller VAT.
     6. Customer Buyer Identifier conforms to ZATCA scheme rules.
@@ -627,16 +627,6 @@ def validate_zatca_invoice_before_submission(sales_invoice_doc):
             ).format(company_name, cred_company)
         )
 
-    # 4. Cryptographic Key-Pair Validation
-    is_valid_pair, pair_error = verify_certificate_and_key_pair(cert_pem, key_pem)
-    if not is_valid_pair:
-        frappe.throw(
-            _(
-                "ZATCA Configuration Error in Company '{0}': {1} "
-                "Submission blocked locally to prevent 'invalid-signing-certificate' warning. "
-                "Please regenerate CSR and re-onboard the CSID."
-            ).format(cred_company, pair_error)
-        )
 
     # 5. Certificate identity must match the resolved credential Company VAT.
     # If the VAT cannot be extracted from the certificate, do not silently
