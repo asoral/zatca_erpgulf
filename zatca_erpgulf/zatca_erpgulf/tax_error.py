@@ -28,13 +28,13 @@ def validate_sales_invoice_taxes(doc, event=None):
 
     if not is_zatca_enabled:
         return
-    if doc.doctype == "Sales Invoice" and doc.custom_zatca_pmm == 1:
+    if doc.doctype == "Sales Invoice" and getattr(doc, "custom_zatca_pmm", 0) == 1:
         return
     is_gpos_installed = "gpos" in frappe.get_installed_apps()
     field_exists = frappe.get_meta(doc.doctype).has_field("custom_unique_id")
 
     if is_gpos_installed and field_exists:
-        if doc.custom_unique_id and not doc.custom_zatca_pos_name:
+        if getattr(doc, "custom_unique_id", None) and not getattr(doc, "custom_zatca_pos_name", None):
             frappe.throw(_(
                 "ZATCA POS Machine name is missing for invoice, Add ZATCA POS machine name"
             ))
@@ -55,7 +55,7 @@ def validate_sales_invoice_taxes(doc, event=None):
         return
 
     # If the company requires cost centers, ensure the invoice has one
-    if doc.custom_zatca_pos_name:
+    if getattr(doc, "custom_zatca_pos_name", None):
         zatca_settings = frappe.get_doc("ZATCA Multiple Setting", doc.custom_zatca_pos_name)
 
         # Get the linked Company from custom_linked_doctype

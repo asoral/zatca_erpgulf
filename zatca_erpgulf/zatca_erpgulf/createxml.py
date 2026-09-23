@@ -756,13 +756,30 @@ def customer_data(invoice, sales_invoice_doc):
         buyer_id_type = getattr(customer_doc, "custom_buyer_id_type", None)
         is_b2c = getattr(sales_invoice_doc, "custom_b2c", 0) == 1 or getattr(customer_doc, "custom_b2c", 0) == 1
 
-        if (not is_b2c or buyer_id) and buyer_id and buyer_id_type and str(buyer_id).strip() and str(buyer_id_type).strip():
-            cac_partyidentification_1 = ET.SubElement(
-                cac_party_2, "cac:PartyIdentification"
-            )
-            cbc_id_4 = ET.SubElement(cac_partyidentification_1, CBC_ID)
-            cbc_id_4.set("schemeID", str(buyer_id_type).strip())
-            cbc_id_4.text = str(buyer_id).strip()
+        if buyer_id and buyer_id_type and str(buyer_id).strip() and str(buyer_id_type).strip():
+            b_id = str(buyer_id).strip()
+            b_type = str(buyer_id_type).strip().upper()
+            valid_buyer_id = False
+            if b_type == "IQA":
+                valid_buyer_id = b_id.isdigit() and len(b_id) == 10 and b_id.startswith("2")
+            elif b_type == "NAT":
+                valid_buyer_id = b_id.isdigit() and len(b_id) == 10 and b_id.startswith("1")
+            elif b_type in ["CRN", "MOM", "MLS", "SAG", "OTH", "PAS"]:
+                valid_buyer_id = not (b_id.isdigit() and len(b_id) == 15 and b_id == str(getattr(customer_doc, "tax_id", "")).strip())
+            elif b_type == "TIN":
+                valid_buyer_id = b_id.isdigit() and len(b_id) == 10
+            elif b_type == "700":
+                valid_buyer_id = b_id.isdigit() and len(b_id) == 10 and b_id.startswith("700")
+            else:
+                valid_buyer_id = not (b_id.isdigit() and len(b_id) == 15 and b_id == str(getattr(customer_doc, "tax_id", "")).strip())
+
+            if valid_buyer_id:
+                cac_partyidentification_1 = ET.SubElement(
+                    cac_party_2, "cac:PartyIdentification"
+                )
+                cbc_id_4 = ET.SubElement(cac_partyidentification_1, CBC_ID)
+                cbc_id_4.set("schemeID", b_type)
+                cbc_id_4.text = b_id
 
         country_dict = country_code_mapping()
         address = None

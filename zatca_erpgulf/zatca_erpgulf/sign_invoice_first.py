@@ -620,6 +620,8 @@ def digital_signature(hash1, company_abbr, source_doc):
                 private_key_data_str = source_doc.get("custom_private_key")
 
         if not private_key_data_str:
+            private_key_data_str = company_doc.get("custom_private_key")
+        if not private_key_data_str:
             frappe.throw(_("No private key data found for the company."))
         private_key_bytes = private_key_data_str.encode("utf-8")
         private_key = serialization.load_pem_private_key(
@@ -669,7 +671,9 @@ def extract_certificate_details(company_abbr, source_doc):
                 certificate_data_str = source_doc.get("custom_certficate")
 
         if not certificate_data_str:
-            frappe.throw(_(f"No certificate data found for company {source_doc}"))
+            certificate_data_str = company_doc.get("custom_certificate")
+        if not certificate_data_str:
+            frappe.throw(_(f"No certificate data found for company {source_doc or company_name}"))
 
         certificate_content = certificate_data_str.strip()
 
@@ -729,6 +733,8 @@ def certificate_hash(company_abbr, source_doc):
             elif source_doc.doctype == "ZATCA Multiple Setting":
                 certificate_data_str = source_doc.get("custom_certficate")
 
+        if not certificate_data_str:
+            certificate_data_str = company_doc.get("custom_certificate")
         if not certificate_data_str:
             frappe.throw(_(f"No certificate data found for company {company_name}"))
         certificate_data = certificate_data_str.strip()
