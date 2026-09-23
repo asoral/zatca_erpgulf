@@ -557,7 +557,14 @@ frappe.ui.form.on("Sales Invoice", {
 });
 
 function toggle_return_against_field(frm) {
-    if (!frm.doc.company) {
+    if (!frm.doc.company || !frm.fields_dict.custom_return_against_for_zatca) {
+        if (frm.fields_dict.custom_return_against_for_zatca) {
+            frm.set_df_property("custom_return_against_for_zatca", "hidden", 1);
+        }
+        return;
+    }
+
+    if (!frappe.meta.has_field("Company", "custom_allow_creditnote_without_original_invoice_in_the_system")) {
         frm.set_df_property("custom_return_against_for_zatca", "hidden", 1);
         return;
     }
@@ -567,30 +574,35 @@ function toggle_return_against_field(frm) {
         frm.doc.company,
         "custom_allow_creditnote_without_original_invoice_in_the_system"
     ).then((r) => {
+        if (!r || !r.message) return;
         const show_field =
             frm.doc.is_return == 1 &&
             cint(r.message.custom_allow_creditnote_without_original_invoice_in_the_system) == 1;
 
-        frm.set_df_property(
-            "custom_return_against_for_zatca",
-            "hidden",
-            !show_field
-        );
+        if (frm.fields_dict.custom_return_against_for_zatca) {
+            frm.set_df_property(
+                "custom_return_against_for_zatca",
+                "hidden",
+                !show_field
+            );
+        }
     });
 }
 
 frappe.ui.form.on('Sales Invoice', {
     refresh(frm) {
-        frm.fields_dict.custom_zatca_pmm_warning.$wrapper.html(`
-            <div style="
-                background:#fff3cd;
-                border:1px solid #ffeeba;
-                padding:10px;
-                border-radius:4px;
-                margin-top:5px;">
-                ⚠️ <b>Important:</b> Please consult your auditor or ZATCA account manager before selecting invoice type, to ensure you are fully legally compliant and eligible to use it.
-            </div>
-        `);
+        if (frm.fields_dict.custom_zatca_pmm_warning && frm.fields_dict.custom_zatca_pmm_warning.$wrapper) {
+            frm.fields_dict.custom_zatca_pmm_warning.$wrapper.html(`
+                <div style="
+                    background:#fff3cd;
+                    border:1px solid #ffeeba;
+                    padding:10px;
+                    border-radius:4px;
+                    margin-top:5px;">
+                    ⚠️ <b>Important:</b> Please consult your auditor or ZATCA account manager before selecting invoice type, to ensure you are fully legally compliant and eligible to use it.
+                </div>
+            `);
+        }
     }
 });
 
