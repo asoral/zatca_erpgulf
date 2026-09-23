@@ -747,13 +747,13 @@ def item_data_advance(invoice, sales_invoice_doc, invoice_number):
             if sales_invoice_doc.custom_zatca_tax_category != "Standard":
                 reason_code = sales_invoice_doc.custom_exemption_reason_code
                 cbc_taxexemptionreasoncode = ET.SubElement(
-                    tax_category,
+                    cac_classifiedtaxcategory,
                     "cbc:TaxExemptionReasonCode"
                 )
                 cbc_taxexemptionreasoncode.text = reason_code
 
                 cbc_taxexemptionreason = ET.SubElement(
-                    tax_category,
+                    cac_classifiedtaxcategory,
                     "cbc:TaxExemptionReason"
                 )
 

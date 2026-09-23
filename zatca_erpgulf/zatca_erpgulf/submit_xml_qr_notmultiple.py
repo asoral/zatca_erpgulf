@@ -451,14 +451,18 @@ def reporting_api_xml_purchase_invoice_simplified(
         handle_api_error_for_purchase_invoice(invoice_number, e)
 
 
-# def get_production_csid(sales_invoice_doc, company_doc):
-#     """get production csid"""
-#     if sales_invoice_doc.custom_zatca_pos_name:
-#         zatca_settings = frappe.get_doc(
-#             "ZATCA Multiple Setting", sales_invoice_doc.custom_zatca_pos_name
-#         )
-#         return zatca_settings.custom_final_auth_csid
-#     return company_doc.custom_basic_auth_from_production
+def get_production_csid(invoice_doc, company_doc):
+    """get production csid"""
+    if getattr(invoice_doc, "custom_zatca_pos_name", None):
+        zatca_settings = frappe.get_doc(
+            "ZATCA Multiple Setting", invoice_doc.custom_zatca_pos_name
+        )
+        if getattr(zatca_settings, "custom__use_company_certificate__keys", 0) != 1:
+            return zatca_settings.custom_final_auth_csid
+        else:
+            linked_doc = frappe.get_doc("Company", zatca_settings.custom_linked_doctype)
+            return linked_doc.custom_basic_auth_from_production
+    return company_doc.custom_basic_auth_from_production
 
 
 
