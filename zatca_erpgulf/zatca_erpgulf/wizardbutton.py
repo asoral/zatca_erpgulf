@@ -139,6 +139,7 @@ def wizard_button(company_abbr, button, pos=0, machine=None):
             headers=headers,
             data=payload,
             timeout=300,
+            verify=False,
         )
 
         # Handle response
