@@ -383,13 +383,13 @@ frappe.ui.form.on('Sales Invoice', {
         try {
             let jsonText = null;
 
-            // Try extract after 'ZATCA Response:'
-            const anchor = 'ZATCA Response:';
-            if (response.includes(anchor)) {
-                const afterAnchor = response.split(anchor)[1];
+            // Try extract after 'ZATCA Response:' or 'Zatca Response:'
+            const anchorMatch = response.match(/ZATCA\s*Response:/i);
+            if (anchorMatch) {
+                const afterAnchor = response.slice(anchorMatch.index + anchorMatch[0].length);
                 const firstBrace = afterAnchor.indexOf('{');
                 const lastBrace = afterAnchor.lastIndexOf('}');
-                if (firstBrace !== -1 && lastBrace !== -1) {
+                if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
                     jsonText = afterAnchor.slice(firstBrace, lastBrace + 1).trim();
                 }
             }
