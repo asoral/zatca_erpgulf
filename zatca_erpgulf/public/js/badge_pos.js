@@ -1,3 +1,35 @@
+function extractZatcaJson(rawText) {
+    if (!rawText || typeof rawText !== "string") return null;
+
+    // 1. Try matching after ZATCA/Zatca Response: (case-insensitive, multiline)
+    let match = rawText.match(/ZATCA\s*Response:\s*(\{[\s\S]*\})/i);
+    if (match && match[1]) {
+        let candidate = match[1].trim();
+        let lastBrace = candidate.lastIndexOf("}");
+        if (lastBrace !== -1) {
+            try {
+                return JSON.parse(candidate.substring(0, lastBrace + 1));
+            } catch (e) {}
+        }
+    }
+
+    // 2. Fallback: Find the first '{' and last '}' in the string
+    let firstBrace = rawText.indexOf("{");
+    let lastBrace = rawText.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        try {
+            return JSON.parse(rawText.substring(firstBrace, lastBrace + 1));
+        } catch (e) {}
+    }
+
+    // 3. Fallback: Direct parse
+    try {
+        return JSON.parse(rawText);
+    } catch (e) {}
+
+    return null;
+}
+
 frappe.ui.form.on('POS Invoice', {
     refresh(frm) {
         console.log("POS Invoice Form refreshed!");
@@ -41,14 +73,35 @@ frappe.ui.form.on('POS Invoice', {
             }
 
             // ✅ Case 3: Parse JSON response
-            let jsonMatch = responseText.match(/ZATCA Response: ({.*})/);
-            if (!jsonMatch) throw "No JSON found in ZATCA response!";
-            let zatcaResponse = JSON.parse(jsonMatch[1]);
+            let zatcaResponse = extractZatcaJson(responseText);
+            const reportingStatus = (frm.doc.custom_zatca_status || '').toUpperCase(); // CLEARED / REPORTED
+
+            if (!zatcaResponse) {
+                // If direct JSON extraction didn't work, fallback to reportingStatus
+                if (reportingStatus === 'CLEARED' || reportingStatus === 'REPORTED') {
+                    let hasWarnings = responseText.toLowerCase().includes('warning');
+                    let badgeImg = reportingStatus === 'CLEARED'
+                        ? (hasWarnings ? 'zatca-cleared-warning.png' : 'zatca-cleared.png')
+                        : (hasWarnings ? 'zatca-reported-warning.png' : 'zatca-reported.png');
+                    let altText = reportingStatus === 'CLEARED'
+                        ? (hasWarnings ? 'Cleared with Warning' : 'Cleared')
+                        : (hasWarnings ? 'Reported with Warning' : 'Reported');
+                    let badgeHtml = `
+                        <div class="zatca-badge-container">
+                            <img src="/assets/zatca_erpgulf/js/badges/${badgeImg}"
+                                 alt="${altText}" class="zatca-badge" width="110" height="100"
+                                 style="margin-top: -5px; margin-left: 380px;">
+                        </div>`;
+                    frm.set_df_property('custom_zatca_status_notification', 'options', badgeHtml);
+                    frm.refresh_field('custom_zatca_status_notification');
+                    return;
+                }
+                throw "No JSON found in ZATCA response!";
+            }
 
             const validationResults = zatcaResponse.validationResults || {};
             let errors = Array.isArray(validationResults.errorMessages) ? validationResults.errorMessages : [];
             const warnings = Array.isArray(validationResults.warningMessages) ? validationResults.warningMessages : [];
-            const reportingStatus = frm.doc.custom_zatca_status || ''; // CLEARED / REPORTED
 
             // Filter duplicate-invoice errors (not critical)
             errors = errors.filter(e => !(e.code === "Invoice-Errors" && e.category === "Duplicate-Invoice"));

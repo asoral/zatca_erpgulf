@@ -110,80 +110,119 @@
 
 
 
+function extractZatcaJson(rawText) {
+    if (!rawText || typeof rawText !== "string") return null;
+
+    // 1. Try matching after ZATCA/Zatca Response: (case-insensitive, multiline)
+    let match = rawText.match(/ZATCA\s*Response:\s*(\{[\s\S]*\})/i);
+    if (match && match[1]) {
+        let candidate = match[1].trim();
+        let lastBrace = candidate.lastIndexOf("}");
+        if (lastBrace !== -1) {
+            try {
+                return JSON.parse(candidate.substring(0, lastBrace + 1));
+            } catch (e) {}
+        }
+    }
+
+    // 2. Fallback: Find the first '{' and last '}' in the string
+    let firstBrace = rawText.indexOf("{");
+    let lastBrace = rawText.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        try {
+            return JSON.parse(rawText.substring(firstBrace, lastBrace + 1));
+        } catch (e) {}
+    }
+
+    // 3. Fallback: Direct parse
+    try {
+        return JSON.parse(rawText);
+    } catch (e) {}
+
+    return null;
+}
+
 frappe.ui.form.on('Sales Invoice', {
     refresh(frm) {
         console.log("Form refreshed!");
         frm.set_df_property('custom_zatca_status_notification', 'options', ' ');
 
-        if (frm.doc.custom_zatca_full_response) {
-            try {
-                console.log("custom_zatca_full_response found:", frm.doc.custom_zatca_full_response);
-                let ztcaresponse = frm.doc.custom_zatca_full_response;
+        let responseText = frm.doc.custom_zatca_full_response || '';
+        let reportingStatus = (frm.doc.custom_zatca_status || '').toUpperCase();
 
-                // ✅ Check if the response starts with "Error"
-                if (ztcaresponse.trim().toUpperCase().startsWith("ERROR")) {
+        if (responseText) {
+            try {
+                console.log("custom_zatca_full_response found:", responseText);
+
+                // Ignore Not Submitted / Intra-company transfer
+                if (responseText.trim().toUpperCase() === "NOT SUBMITTED" || responseText.trim().toUpperCase() === "INTRA-COMPANY TRANSFER") {
+                    frm.set_df_property('custom_zatca_status_notification', 'options', ' ');
+                    frm.refresh_field('custom_zatca_status_notification');
+                    return;
+                }
+
+                // Check if the response starts with "Error"
+                if (responseText.trim().toUpperCase().startsWith("ERROR") || responseText.trim().toUpperCase().startsWith("FAILED")) {
                     console.log("Error detected in ZATCA response. Displaying Failed badge.");
                     let badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-failed.png" alt="Failed" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
                     frm.set_df_property('custom_zatca_status_notification', 'options', badgeHtml);
                     frm.refresh_field('custom_zatca_status_notification');
-                    return; // Exit since it's an error
+                    return;
                 }
 
-                // Parse JSON
-                let zatcaResponse = JSON.parse(ztcaresponse.match(/ZATCA Response: ({.*})/)[1]);
-                const validationResults = zatcaResponse.validationResults || {};
-                const status = validationResults.status; // PASS / WARNING / FAILED
-                const reportingStatus = frm.doc.custom_zatca_status || ''; // Cleared / Reported
-                let errors = Array.isArray(validationResults.errorMessages) ? validationResults.errorMessages : [];
-                const warnings = Array.isArray(validationResults.warningMessages) ? validationResults.warningMessages : [];
+                // Parse JSON using robust extractor
+                let zatcaResponse = extractZatcaJson(responseText);
+                let badgeHtml = '';
 
-                // 🔴 Special condition → ignore Duplicate-Invoice error
-                errors = errors.filter(e => !(e.code === "Invoice-Errors" && e.category === "Duplicate-Invoice"));
-                const duplicateErrorExists = Array.isArray(validationResults.errorMessages) && validationResults.errorMessages.some(e => e.code === "Invoice-Errors" && e.category === "Duplicate-Invoice");
-                if (duplicateErrorExists && errors.length === 0) {
-                    console.log('Duplicate Invoice detected. Showing Duplicate badge.');
-                    let badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-duplicated.png" alt="Duplicate" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
-                    frm.set_df_property('custom_zatca_status_notification', 'options', badgeHtml);
-                    frm.refresh_field('custom_zatca_status_notification');
-                    return; // Exit early since we handled duplicate
-                }
-                console.log("Validation Status:", status);
-                console.log("Reporting Status (from custom_zatca_status):", reportingStatus);
-                console.log("Warnings:", warnings);
-                console.log("Errors (after filtering):", errors);
+                if (zatcaResponse) {
+                    const validationResults = zatcaResponse.validationResults || {};
+                    const status = validationResults.status; // PASS / WARNING / FAILED
+                    let errors = Array.isArray(validationResults.errorMessages) ? validationResults.errorMessages : [];
+                    const warnings = Array.isArray(validationResults.warningMessages) ? validationResults.warningMessages : [];
 
-                let badgeHtml = ''; // Placeholder for image HTML
+                    // Ignore Duplicate-Invoice error
+                    errors = errors.filter(e => !(e.code === "Invoice-Errors" && e.category === "Duplicate-Invoice"));
+                    const duplicateErrorExists = Array.isArray(validationResults.errorMessages) && validationResults.errorMessages.some(e => e.code === "Invoice-Errors" && e.category === "Duplicate-Invoice");
 
-                // 🟢 PASS Conditions
-                if (status === 'PASS' || (status === 'FAILED' && errors.length === 0)) {
-                    if (reportingStatus === 'CLEARED') {
-                        console.log('PASS - Cleared');
-                        badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared.png" alt="Cleared" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
-
-                    } else if (reportingStatus === 'REPORTED') {
-                        console.log('PASS - Reported');
-                        badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported.png" alt="Reported" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
+                    if (duplicateErrorExists && errors.length === 0) {
+                        console.log('Duplicate Invoice detected. Showing Duplicate badge.');
+                        badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-duplicated.png" alt="Duplicate" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
+                    } else if (status === 'PASS' || (status === 'FAILED' && errors.length === 0)) {
+                        if (reportingStatus === 'CLEARED') {
+                            console.log('PASS - Cleared');
+                            badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared.png" alt="Cleared" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
+                        } else if (reportingStatus === 'REPORTED') {
+                            console.log('PASS - Reported');
+                            badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported.png" alt="Reported" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
+                        }
+                    } else if (status === 'WARNING') {
+                        if (reportingStatus === 'CLEARED') {
+                            console.log('WARNING - Cleared with Warning');
+                            badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared-warning.png" alt="Cleared with Warning" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
+                        } else if (reportingStatus === 'REPORTED') {
+                            console.log('WARNING - Reported with Warning');
+                            badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported-warning.png" alt="Reported with Warning" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
+                        }
+                    } else if (status === 'FAILED' && errors.length > 0) {
+                        console.log('FAILED (real errors)');
+                        badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-failed.png" alt="Failed" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
                     }
                 }
 
-                // 🟡 WARNING Conditions
-                else if (status === 'WARNING') {
+                // Fallback: If JSON couldn't be parsed or didn't yield a badge, but reportingStatus is valid
+                if (!badgeHtml && reportingStatus) {
+                    let hasWarnings = responseText.toLowerCase().includes('warning');
                     if (reportingStatus === 'CLEARED') {
-                        console.log('WARNING - Cleared with Warning');
-                        badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared-warning.png" alt="Cleared with Warning" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
+                        badgeHtml = hasWarnings
+                            ? '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared-warning.png" alt="Cleared with Warning" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>'
+                            : '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared.png" alt="Cleared" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
                     } else if (reportingStatus === 'REPORTED') {
-                        console.log('WARNING - Reported with Warning');
-                        badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported-warning.png" alt="Reported with Warning" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
+                        badgeHtml = hasWarnings
+                            ? '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported-warning.png" alt="Reported with Warning" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>'
+                            : '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported.png" alt="Reported" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
                     }
                 }
 
-                // 🔴 FAILED Condition (only if real errors remain)
-                else if (status === 'FAILED' && errors.length > 0) {
-                    console.log('FAILED (real errors)');
-                    badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-failed.png" alt="Failed" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>';
-                }
-
-                // Set Badge or Clear if None
                 if (badgeHtml) {
                     frm.set_df_property('custom_zatca_status_notification', 'options', badgeHtml);
                 } else {
@@ -193,11 +232,25 @@ frappe.ui.form.on('Sales Invoice', {
 
             } catch (error) {
                 console.error('Error parsing custom_zatca_full_response:', error);
-                frm.set_df_property('custom_zatca_status_notification', 'options', '');
+                // Graceful fallback to reportingStatus
+                if (reportingStatus === 'CLEARED') {
+                    frm.set_df_property('custom_zatca_status_notification', 'options', '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared.png" alt="Cleared" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>');
+                } else if (reportingStatus === 'REPORTED') {
+                    frm.set_df_property('custom_zatca_status_notification', 'options', '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported.png" alt="Reported" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>');
+                } else {
+                    frm.set_df_property('custom_zatca_status_notification', 'options', '');
+                }
             }
         } else {
             console.log('No custom_zatca_full_response found.');
-            frm.set_df_property('custom_zatca_status_notification', 'options', ' ');
+            // Even if full_response is not yet set, check reportingStatus
+            if (reportingStatus === 'CLEARED') {
+                frm.set_df_property('custom_zatca_status_notification', 'options', '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared.png" alt="Cleared" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>');
+            } else if (reportingStatus === 'REPORTED') {
+                frm.set_df_property('custom_zatca_status_notification', 'options', '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported.png" alt="Reported" class="zatca-badge" width="110" height="100" style="margin-top: -5px; margin-left: 215px;"></div>');
+            } else {
+                frm.set_df_property('custom_zatca_status_notification', 'options', ' ');
+            }
         }
 
         frm.refresh_field('custom_zatca_status_notification');

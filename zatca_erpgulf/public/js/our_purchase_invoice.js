@@ -1,3 +1,35 @@
+function extractZatcaJson(rawText) {
+    if (!rawText || typeof rawText !== "string") return null;
+
+    // 1. Try matching after ZATCA/Zatca Response: (case-insensitive, multiline)
+    let match = rawText.match(/ZATCA\s*Response:\s*(\{[\s\S]*\})/i);
+    if (match && match[1]) {
+        let candidate = match[1].trim();
+        let lastBrace = candidate.lastIndexOf("}");
+        if (lastBrace !== -1) {
+            try {
+                return JSON.parse(candidate.substring(0, lastBrace + 1));
+            } catch (e) {}
+        }
+    }
+
+    // 2. Fallback: Find the first '{' and last '}' in the string
+    let firstBrace = rawText.indexOf("{");
+    let lastBrace = rawText.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        try {
+            return JSON.parse(rawText.substring(firstBrace, lastBrace + 1));
+        } catch (e) {}
+    }
+
+    // 3. Fallback: Direct parse
+    try {
+        return JSON.parse(rawText);
+    } catch (e) {}
+
+    return null;
+}
+
 frappe.ui.form.on('Purchase Invoice', {
     refresh: function(frm) {        
         // Check company country and hide/show fields
@@ -109,48 +141,59 @@ frappe.ui.form.on('Purchase Invoice', {
                     return; // Exit since it's an error
                 }
             
-                let zatcaResponse = JSON.parse(ztcaresponse.match(/Zatca Response: ({.*})/)[1]);
-
-                const validationResults = zatcaResponse.validationResults || {};
-                const status = validationResults.status; // PASS/WARNINGAILED
-
-                // Use reporting status from custom_zatca_status field
-                const reportingStatus = frm.doc.custom_zatca_status || ''; // Cleared/Reported
-                const warnings = validationResults.warningMessages || [];
-
-                console.log("Validation Status:", status);
-                console.log("Reporting Status (from custom_zatca_status):", reportingStatus);
-                console.log("Warnings:", warnings);
+                let zatcaResponse = extractZatcaJson(ztcaresponse);
+                const reportingStatus = (frm.doc.custom_zatca_status || '').toUpperCase(); // CLEARED / REPORTED
 
                 let badgeHtml = ''; // Placeholder for image HTML
 
-                // 🟢 PASS Conditions
-                if (status === 'PASS') {
-                    if (reportingStatus === 'CLEARED') {
-                        console.log('PASS - Cleared');
-                        badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared.png" alt="Cleared" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>';
+                if (zatcaResponse) {
+                    const validationResults = zatcaResponse.validationResults || {};
+                    const status = validationResults.status; // PASS / WARNING / FAILED
+                    const warnings = validationResults.warningMessages || [];
 
-                    } else if (reportingStatus === 'REPORTED') {
-                        console.log('PASS - Reported');
-                        badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported.png" alt="Reported" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>';
+                    console.log("Validation Status:", status);
+                    console.log("Reporting Status (from custom_zatca_status):", reportingStatus);
+                    console.log("Warnings:", warnings);
+
+                    // 🟢 PASS Conditions
+                    if (status === 'PASS') {
+                        if (reportingStatus === 'CLEARED') {
+                            console.log('PASS - Cleared');
+                            badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared.png" alt="Cleared" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>';
+                        } else if (reportingStatus === 'REPORTED') {
+                            console.log('PASS - Reported');
+                            badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported.png" alt="Reported" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>';
+                        }
+                    }
+                    // 🟡 WARNING Conditions
+                    else if (status === 'WARNING') {
+                        if (reportingStatus === 'CLEARED') {
+                            console.log('WARNING - Cleared with Warning');
+                            badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared-warning.png" alt="Cleared with Warning" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>';
+                        } else if (reportingStatus === 'REPORTED') {
+                            console.log('WARNING - Reported with Warning');
+                            badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported-warning.png" alt="Reported with Warning" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>';
+                        }
+                    }
+                    // 🔴 FAILED Condition
+                    else {
+                        console.log('FAILED');
+                        badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-failed.png" alt="Failed" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>';
                     }
                 }
 
-                // 🟡 WARNING Conditions
-                else if (status === 'WARNING') {
+                // Fallback: If JSON couldn't be parsed or didn't yield a badge, but reportingStatus is valid
+                if (!badgeHtml && reportingStatus) {
+                    let hasWarnings = ztcaresponse.toLowerCase().includes('warning');
                     if (reportingStatus === 'CLEARED') {
-                        console.log('WARNING - Cleared with Warning');
-                        badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared-warning.png" alt="Cleared with Warning" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>';
+                        badgeHtml = hasWarnings
+                            ? '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared-warning.png" alt="Cleared with Warning" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>'
+                            : '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared.png" alt="Cleared" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>';
                     } else if (reportingStatus === 'REPORTED') {
-                        console.log('WARNING - Reported with Warning');
-                        badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported-warning.png" alt="Reported with Warning" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>';
+                        badgeHtml = hasWarnings
+                            ? '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported-warning.png" alt="Reported with Warning" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>'
+                            : '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported.png" alt="Reported" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>';
                     }
-                }
-
-                // 🔴 FAILED Condition
-                else {
-                    console.log('FAILED');
-                    badgeHtml = '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-failed.png" alt="Failed" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>';
                 }
 
                 // Set Badge or Clear if None
@@ -163,11 +206,23 @@ frappe.ui.form.on('Purchase Invoice', {
 
             } catch (error) {
                 console.error('Error parsing custom_zatca_full_response:', error);
-                frm.set_df_property('custom_zatca_status_notification', 'options', '');
+                if (reportingStatus === 'CLEARED') {
+                    frm.set_df_property('custom_zatca_status_notification', 'options', '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared.png" alt="Cleared" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>');
+                } else if (reportingStatus === 'REPORTED') {
+                    frm.set_df_property('custom_zatca_status_notification', 'options', '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported.png" alt="Reported" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>');
+                } else {
+                    frm.set_df_property('custom_zatca_status_notification', 'options', '');
+                }
             }
         } else {
             console.log('No custom_zatca_full_response found.');
-            frm.set_df_property('custom_zatca_status_notification', 'options', ' ');
+            if (reportingStatus === 'CLEARED') {
+                frm.set_df_property('custom_zatca_status_notification', 'options', '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-cleared.png" alt="Cleared" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>');
+            } else if (reportingStatus === 'REPORTED') {
+                frm.set_df_property('custom_zatca_status_notification', 'options', '<div class="zatca-badge-container"><img src="/assets/zatca_erpgulf/js/badges/zatca-reported.png" alt="Reported" class="zatca-badge" width="110" height="36" style="margin-top: -5px; margin-left: 215px;"></div>');
+            } else {
+                frm.set_df_property('custom_zatca_status_notification', 'options', ' ');
+            }
         }
 
         frm.refresh_field('custom_zatca_status_notification');
