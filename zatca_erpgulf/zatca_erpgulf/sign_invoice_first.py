@@ -1359,6 +1359,7 @@ def compliance_api_call(
             headers=headers,
             data=payload,
             timeout=300,
+            verify=False,
         )
         if response.status_code == 200:
             frappe.msgprint(

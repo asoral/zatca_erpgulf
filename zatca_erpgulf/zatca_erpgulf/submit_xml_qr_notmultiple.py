@@ -186,6 +186,7 @@ def reporting_api_xml_sales_invoice_simplified(
                 headers=headers,
                 json=payload,
                 timeout=480,
+                verify=False,
             )
             frappe.publish_realtime("hide_gif", user=frappe.session.user)
             if response.status_code in (200, 202, 409):
