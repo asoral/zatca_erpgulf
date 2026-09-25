@@ -125,6 +125,7 @@ function show_zatca_fields(frm) {
 frappe.ui.form.on('Purchase Invoice', {
     refresh(frm) {
         console.log("Form refreshed!");
+        const reportingStatus = (frm.doc.custom_zatca_status || '').toUpperCase(); // CLEARED / REPORTED
         frm.set_df_property('custom_zatca_status_notification', 'options', ' ');
 
         if (frm.doc.custom_zatca_full_response) {
@@ -142,7 +143,6 @@ frappe.ui.form.on('Purchase Invoice', {
                 }
             
                 let zatcaResponse = extractZatcaJson(ztcaresponse);
-                const reportingStatus = (frm.doc.custom_zatca_status || '').toUpperCase(); // CLEARED / REPORTED
 
                 let badgeHtml = ''; // Placeholder for image HTML
 
