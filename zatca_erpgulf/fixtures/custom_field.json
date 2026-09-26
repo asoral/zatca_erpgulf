@@ -9519,7 +9519,7 @@
   "name": "Purchase Invoice-custom_zatca_pos_machine_name",
   "no_copy": 1,
   "non_negative": 0,
-  "options": "Zatca Multiple Setting",
+  "options": "ZATCA Multiple Setting",
   "permlevel": 0,
   "placeholder": null,
   "precision": "",
