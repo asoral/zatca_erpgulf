@@ -72,18 +72,18 @@ def validate_sales_invoice_taxes(doc, event=None):
         if doc.cost_center and frappe.db.exists("Cost Center", doc.cost_center):
             cost_center_doc = frappe.get_doc("Cost Center", doc.cost_center)
             if getattr(cost_center_doc, "custom_zatca_branch_address", None):
-                if not getattr(cost_center_doc, "custom_registration_type", None):
+                if not getattr(cost_center_doc, "custom_zatca__registration_type", None):
                     frappe.throw(
                         _(
-                            f"As per ZATCA regulation, The Cost Center '{doc.cost_center}' is missing a valid registration_type. "
-                            "Please update the Cost Center with a valid `custom_registration_type`."
+                            f"As per ZATCA regulation, The Cost Center '{doc.cost_center}' is missing a valid registration type. "
+                            "Please update the Cost Center with a valid `custom_zatca__registration_type`."
                         )
                     )
-                if not getattr(cost_center_doc, "custom_company_registration", None):
+                if not getattr(cost_center_doc, "custom_zatca__registration_number", None):
                     frappe.throw(
                         _(
                             f"As per ZATCA regulation, The Cost Center '{doc.cost_center}' is missing a valid company registration. "
-                            "Please update the Cost Center with a valid `custom_company_registration`."
+                            "Please update the Cost Center with a valid `custom_zatca__registration_number`."
                         )
                     )
         else:
